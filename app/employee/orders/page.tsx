@@ -47,6 +47,7 @@ type Order = {
   createdByEmployeeName: string;
   status: string;
   createdAt: any;
+  driverName?: string;
 };
 
 /* ---------- Helpers ---------- */
@@ -173,25 +174,30 @@ export default function EmployeeOrdersPage() {
     try {
       await ensureAnonymousAuth();
 
-      // 🔒 NUEVO: verificar pumps ya usados en pedidos activos
-      const activeOrders = orders.filter(
-        (o) => o.status && o.status !== "DELIVERED"
+      /**
+       * 🔒 BLOQUEO ABSOLUTO DE PUMPS OCUPADOS
+       * - Busca en Firestore
+       * - Cualquier pedido NO ENTREGADO
+       * - Sin importar cliente, empleado o conductor
+       */
+      const q = query(
+        collection(db, "orders"),
+        where("pumpNumbers", "array-contains-any", pumpNumbers)
       );
 
-      const duplicatedPumps = pumpNumbers.filter((num) =>
-        activeOrders.some((o) => o.pumpNumbers?.includes(num))
+      const snap = await getDocs(q);
+
+      const conflict = snap.docs.find(
+        (d) => d.data().status && d.data().status !== "DELIVERED"
       );
 
-      if (duplicatedPumps.length > 0) {
+      if (conflict) {
         setError(
-          `The following pump(s) are already assigned to an active order: ${duplicatedPumps.join(
-            ", "
-          )}`
+          "One or more selected pumps are already assigned to an active order."
         );
         setLoading(false);
         return;
       }
-      // 🔒 FIN NUEVO
 
       const customer = customers.find((c) => c.id === customerId);
 
@@ -206,7 +212,6 @@ export default function EmployeeOrdersPage() {
         customerName: customer?.name || "",
         customerCity: customer?.city || "",
 
-        // ✅ Dirección completa (fluye al driver)
         customerAddress: customer?.address || "",
         customerState: customer?.state || "",
         customerCountry: customer?.country || "",
@@ -352,14 +357,21 @@ export default function EmployeeOrdersPage() {
                   Pumps: {o.pumpNumbers?.join(", ")} → {o.customerName}
                 </p>
 
-                {o.customerAddress && (
-                  <p className="text-xs text-white/60">
-                    {o.customerAddress}, {o.customerCity}, {o.customerState}
-                  </p>
-                )}
+                <p className="text-xs">
+                  Estado:{" "}
+                  <span
+                    className={
+                      o.status === "DELIVERED"
+                        ? "text-green-400"
+                        : "text-yellow-400"
+                    }
+                  >
+                    {o.status}
+                  </span>
+                </p>
 
                 <p className="text-xs text-white/60">
-                  Created by: {o.createdByEmployeeName}
+                  Conductor: {o.driverName || "—"}
                 </p>
 
                 <p className="text-xs text-white/40">
