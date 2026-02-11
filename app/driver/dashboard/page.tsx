@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   updateDoc,
   doc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
@@ -183,22 +184,21 @@ export default function DriverDashboardPage() {
     loadOrders(list);
   }
 
-  async function loadOrders(pharmacies?: Pharmacy[]) {
+  // Subscribe to orders in real-time and log updates for debugging
+  function loadOrders(pharmacies?: Pharmacy[]) {
     const pharmacyIds =
       pharmacies?.map((p) => p.pharmacyId) ||
       connectedPharmacies.map((p) => p.pharmacyId);
 
-    const snap = await getDocs(collection(db, "orders"));
-    const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+    // Listen to all orders and filter client-side (simpler and reliable)
+    const unsub = onSnapshot(collection(db, "orders"), (snap) => {
+      const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 
-    setAvailableOrders(
-      all.filter(
+      const available = all.filter(
         (o) => o.status === "PENDING" && pharmacyIds.includes(o.pharmacyId)
-      )
-    );
+      );
 
-    setActiveOrders(
-      all.filter(
+      const active = all.filter(
         (o) =>
           o.driverId === driverId &&
           [
@@ -207,9 +207,28 @@ export default function DriverDashboardPage() {
             "ON_WAY_TO_PHARMACY",
             "ON_WAY_TO_CUSTOMER",
           ].includes(o.status)
-      )
-    );
+      );
+
+      console.log("[Driver] orders snapshot — available:", available.length, "active:", active.length);
+
+      setAvailableOrders(available);
+      setActiveOrders(active);
+    });
+
+    return unsub;
   }
+
+  // Ensure we re-subscribe if connected pharmacies change
+  useEffect(() => {
+    let unsub: any = null;
+    if (connectedPharmacies.length > 0 && driverId) {
+      unsub = loadOrders(connectedPharmacies);
+    }
+
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [connectedPharmacies, driverId]);
 
   async function handleAddPharmacy() {
     setLoading(true);

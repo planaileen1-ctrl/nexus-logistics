@@ -95,6 +95,7 @@ export default function EmployeeOrdersPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   /* ---------- Init ---------- */
   useEffect(() => {
@@ -240,7 +241,7 @@ export default function EmployeeOrdersPage() {
         customerCountry: customers.find((c) => c.id === customerId)?.country,
         createdByEmployeeName: employeeName,
         createdByEmployeeId: employeeId,
-        status: "CREATED",
+        status: "PENDING",
         createdAt: serverTimestamp(),
       };
 
@@ -270,6 +271,9 @@ export default function EmployeeOrdersPage() {
       setPumpNumbers([]);
       setPumpSearch("");
       setCustomerId("");
+
+      setInfo("Order created and set to PENDING — drivers will be notified.");
+      setTimeout(() => setInfo(""), 6000);
 
       await loadOrders();
     } catch (err: any) {
@@ -378,6 +382,7 @@ export default function EmployeeOrdersPage() {
           </select>
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
+          {info && <p className="text-green-400 text-sm">{info}</p>}
 
           <button
             onClick={handleCreateOrder}
