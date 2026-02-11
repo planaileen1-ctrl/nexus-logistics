@@ -16,7 +16,7 @@ import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
-// Firebase config from .env.local
+// Firebase config
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
@@ -29,11 +29,14 @@ const firebaseConfig = {
 // Prevent re-initialization (Next.js safe)
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// 🔐 App Check (reCAPTCHA v3)
-if (typeof window !== "undefined") {
+// 🔐 App Check (SAFE INIT)
+if (
+  typeof window !== "undefined" &&
+  process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+) {
   initializeAppCheck(app, {
     provider: new ReCaptchaV3Provider(
-      process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!
+      process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     ),
     isTokenAutoRefreshEnabled: true,
   });
@@ -42,7 +45,7 @@ if (typeof window !== "undefined") {
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// 🔑 Ensure anonymous auth (USED BY REGISTER)
+// 🔑 Ensure anonymous auth
 export async function ensureAnonymousAuth() {
   if (!auth.currentUser) {
     try {
