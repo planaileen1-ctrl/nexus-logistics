@@ -227,22 +227,26 @@ export default function EmployeeOrdersPage() {
 
       const customer = customers.find((c) => c.id === customerId);
 
-      const orderRef = await addDoc(collection(db, "orders"), {
+      const orderPayload = {
         pharmacyId,
         pharmacyName,
         pumpIds,
         pumpNumbers,
         customerId,
-        customerName: customers.find(c => c.id === customerId)?.name,
-        customerCity: customers.find(c => c.id === customerId)?.city,
-        customerAddress: customers.find(c => c.id === customerId)?.address,
-        customerState: customers.find(c => c.id === customerId)?.state,
-        customerCountry: customers.find(c => c.id === customerId)?.country,
+        customerName: customers.find((c) => c.id === customerId)?.name,
+        customerCity: customers.find((c) => c.id === customerId)?.city,
+        customerAddress: customers.find((c) => c.id === customerId)?.address,
+        customerState: customers.find((c) => c.id === customerId)?.state,
+        customerCountry: customers.find((c) => c.id === customerId)?.country,
         createdByEmployeeName: employeeName,
         createdByEmployeeId: employeeId,
         status: "CREATED",
         createdAt: serverTimestamp(),
-      });
+      };
+
+      console.log("Creating order with payload:", orderPayload);
+
+      const orderRef = await addDoc(collection(db, "orders"), orderPayload);
 
       // ✅ ACTUALIZAR ESTADO DE CADA PUMP
       for (let i = 0; i < pumpIds.length; i++) {
@@ -268,9 +272,11 @@ export default function EmployeeOrdersPage() {
       setCustomerId("");
 
       await loadOrders();
-    } catch (err) {
-      console.error(err);
-      setError("Failed to create order");
+    } catch (err: any) {
+      console.error("handleCreateOrder error:", err);
+      setError(
+        err?.message ? `Failed to create order: ${err.message}` : "Failed to create order"
+      );
     } finally {
       setLoading(false);
     }
