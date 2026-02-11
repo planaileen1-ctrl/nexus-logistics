@@ -29,6 +29,7 @@ import { generateSHA256Hash } from "@/lib/hashSignature";
 import { generateDeliveryPDF } from "@/lib/generateDeliveryPDF";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 /* ---------- Types ---------- */
 type Pharmacy = {
@@ -160,6 +161,7 @@ export default function DriverDashboardPage() {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [rawOrders, setRawOrders] = useState<any[]>([]);
   const [showRawOrders, setShowRawOrders] = useState(false);
+  const [authUser, setAuthUser] = useState<any>(null);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
@@ -177,6 +179,21 @@ export default function DriverDashboardPage() {
       await ensureAnonymousAuth();
       if (driverId) loadConnectedPharmacies();
     })();
+  }, []);
+
+  // Monitor auth state and expose for debugging
+  useEffect(() => {
+    try {
+      const auth = getAuth();
+      const unsub = onAuthStateChanged(auth, (u) => {
+        console.log("[Driver] auth state changed:", u);
+        setAuthUser(u);
+      });
+
+      return () => unsub();
+    } catch (err) {
+      console.warn("Auth debug init failed:", err);
+    }
   }, []);
 
   async function loadConnectedPharmacies() {
