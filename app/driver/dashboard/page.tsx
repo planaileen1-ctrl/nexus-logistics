@@ -253,7 +253,7 @@ export default function DriverDashboardPage() {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        setAddPharmacyError("PIN inválido o farmacia no activa.");
+        setAddPharmacyError("Invalid PIN or pharmacy not active.");
         return;
       }
 
@@ -266,7 +266,7 @@ export default function DriverDashboardPage() {
       );
       const dupSnap = await getDocs(dupQ);
       if (!dupSnap.empty) {
-        setAddPharmacyInfo("Ya estás conectado a esa farmacia.");
+        setAddPharmacyInfo("Already connected to that pharmacy.");
         setPharmacyPin("");
         loadConnectedPharmacies();
         return;
@@ -278,12 +278,12 @@ export default function DriverDashboardPage() {
         connectedAt: serverTimestamp(),
       });
 
-      setAddPharmacyInfo("Conectado a la farmacia correctamente.");
+      setAddPharmacyInfo("Successfully connected to pharmacy.");
       setPharmacyPin("");
       loadConnectedPharmacies();
     } catch (err) {
       console.error("handleAddPharmacy error:", err);
-      setAddPharmacyError("Error al conectar con la farmacia.");
+      setAddPharmacyError("Error connecting to pharmacy.");
     } finally {
       setLoading(false);
       setTimeout(() => {
@@ -548,14 +548,14 @@ export default function DriverDashboardPage() {
                 className="border border-green-500/30 rounded p-4 space-y-2"
               >
                 <p className="font-semibold">{o.pharmacyName}</p>
-                <p>Cliente: {o.customerName}</p>
+                <p>Customer: {o.customerName}</p>
 
                 {o.status === "ASSIGNED" && (
                   <button
                     onClick={() => handleOnWayToPharmacy(o.id)}
                     className="w-full bg-yellow-600 py-2 rounded"
                   >
-                    EN CAMINO A RECOGER A LA FARMACIA
+                    ON THE WAY TO PHARMACY
                   </button>
                 )}
 
@@ -567,14 +567,14 @@ export default function DriverDashboardPage() {
                     }}
                     className="w-full bg-indigo-600 py-2 rounded"
                   >
-                    LLEGUÉ A LA FARMACIA
+                    ARRIVED AT PHARMACY
                   </button>
                 )}
 
                 {o.status === "ON_WAY_TO_CUSTOMER" && (
                   <>
                     <p className="text-xs text-green-400">
-                      🚚 En camino a entregar el pedido
+                      🚚 On the way to deliver
                     </p>
                     <button
                       onClick={() => {
@@ -583,7 +583,7 @@ export default function DriverDashboardPage() {
                       }}
                       className="w-full bg-green-600 py-2 rounded"
                     >
-                      LLEGUÉ AL CLIENTE
+                      ARRIVED AT CUSTOMER
                     </button>
                   </>
                 )}
@@ -602,7 +602,7 @@ export default function DriverDashboardPage() {
                 className="border border-white/10 rounded p-4 space-y-2"
               >
                 <p className="font-semibold">{o.pharmacyName}</p>
-                <p className="text-sm">Cliente: {o.customerName}</p>
+                <p className="text-sm">Customer: {o.customerName}</p>
 
                 {o.customerCity && (
                   <p className="text-xs text-white/60">
@@ -617,7 +617,7 @@ export default function DriverDashboardPage() {
                 )}
 
                 <p className="text-xs text-yellow-400">
-                  ⚠️ Pedido médico – detalles completos al recoger
+                  ⚠️ Medical order – complete details available for pickup
                 </p>
 
                 <button
@@ -636,17 +636,17 @@ export default function DriverDashboardPage() {
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
             <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-full max-w-md">
               <p className="font-semibold">
-                Farmacia: {selectedOrder.pharmacyName}
+                Pharmacy: {selectedOrder.pharmacyName}
               </p>
               <p>Pumps: {selectedOrder.pumpNumbers.join(", ")}</p>
-              <p>Dirección: {selectedOrder.customerAddress}</p>
+              <p>Address: {selectedOrder.customerAddress}</p>
 
               <SignatureCanvas
-                label="Firma Empleado Farmacia"
+                label="Pharmacy Staff Signature"
                 onChange={setEmployeeSignature}
               />
               <SignatureCanvas
-                label="Firma Conductor"
+                label="Driver Signature"
                 onChange={setDriverPickupSignature}
               />
 
@@ -675,12 +675,12 @@ export default function DriverDashboardPage() {
                     loadOrders();
                   } catch (err) {
                     console.error("Pickup failed:", err);
-                    alert("Error al confirmar el retiro.");
+                    alert("Error confirming pickup.");
                   }
                 }}
                 className="w-full bg-green-600 py-2 rounded disabled:opacity-50"
               >
-                EN CAMINO A DEJAR EL PEDIDO
+                ON THE WAY TO DELIVER
               </button>
             </div>
           </div>

@@ -272,7 +272,7 @@ export default function EmployeeOrdersPage() {
       setPumpSearch("");
       setCustomerId("");
 
-      setInfo("Order created and set to PENDING — drivers will be notified.");
+      setInfo("Order created and set to PENDING — drivers will receive it.");
       setTimeout(() => setInfo(""), 6000);
 
       await loadOrders();
@@ -408,7 +408,7 @@ export default function EmployeeOrdersPage() {
                 </p>
 
                 <p className="text-xs">
-                  Estado:{" "}
+                  Status:{" "}
                   <span
                     className={
                       o.status === "DELIVERED"
@@ -421,7 +421,7 @@ export default function EmployeeOrdersPage() {
                 </p>
 
                 <p className="text-xs text-white/60">
-                  Conductor: {o.driverName || "—"}
+                  Driver: {o.driverName || "—"}
                 </p>
 
                 <p className="text-xs text-white/40">
