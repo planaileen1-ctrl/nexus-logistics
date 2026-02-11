@@ -21,6 +21,13 @@ import {
   doc,
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
+import { logPumpMovement } from "@/lib/pumpLogger";
+import DeliverySignature from "@/components/DeliverySignature";
+import { uploadSignatureToStorage } from "@/lib/uploadSignature";
+import { generateSHA256Hash } from "@/lib/hashSignature";
+import { generateDeliveryPDF } from "@/lib/generateDeliveryPDF";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
 /* ---------- Types ---------- */
 type Pharmacy = {
@@ -153,8 +160,8 @@ export default function DriverDashboardPage() {
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const [customerSignature, setCustomerSignature] = useState("");
   const [driverSignature, setDriverSignature] = useState("");
+  const [signature, setSignature] = useState<string | null>(null);
   const [employeeSignature, setEmployeeSignature] = useState("");
   const [driverPickupSignature, setDriverPickupSignature] = useState("");
 
@@ -234,6 +241,42 @@ export default function DriverDashboardPage() {
       assignedAt: serverTimestamp(),
     });
     loadOrders();
+
+    // Actualizar estado de bombas y registrar movimiento (PICKED_UP -> IN_TRANSIT)
+    const order =
+      availableOrders.find((o) => o.id === id) ||
+      activeOrders.find((o) => o.id === id);
+
+    if (order) {
+      for (const pumpNumber of order.pumpNumbers) {
+        const q = query(
+          collection(db, "pumps"),
+          where("pumpNumber", "==", pumpNumber),
+          where("pharmacyId", "==", order.pharmacyId)
+        );
+
+        const snap = await getDocs(q);
+
+        if (!snap.empty) {
+          const pumpDoc = snap.docs[0];
+
+          await updateDoc(doc(db, "pumps", pumpDoc.id), {
+            status: "IN_TRANSIT",
+          });
+
+          await logPumpMovement({
+            pumpId: pumpDoc.id,
+            pumpNumber,
+            pharmacyId: order.pharmacyId,
+            orderId: order.id,
+            action: "PICKED_UP",
+            performedById: driverId!,
+            performedByName: driverName!,
+            role: "DRIVER",
+          });
+        }
+      }
+    }
   }
 
   async function handleOnWayToPharmacy(id: string) {
@@ -246,6 +289,77 @@ export default function DriverDashboardPage() {
   async function handleCompleteDelivery() {
     if (!selectedOrder) return;
 
+    if (!signature || !driverSignature) {
+      alert("Both customer and driver signatures are required before delivery.");
+      return;
+    }
+
+    // Obtener geolocalización (cliente)
+    let location: { lat: number; lng: number };
+    try {
+      location = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) =>
+            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => reject(new Error("Location required"))
+        );
+      });
+    } catch (err) {
+      alert("Location access is required for delivery.");
+      return;
+    }
+
+    // Obtener IP cliente
+    let ip = "";
+    try {
+      const res = await fetch("https://api.ipify.org?format=json");
+      const data = await res.json();
+      ip = data.ip;
+    } catch (err) {
+      console.warn("Failed to obtain client IP:", err);
+    }
+
+    const deliveredAtISO = new Date().toISOString();
+
+    // 1️⃣ Subir imagenes a Storage (customer + driver)
+    const signatureUrl = await uploadSignatureToStorage(
+      `${selectedOrder.id}-customer`,
+      signature
+    );
+
+    const driverSignatureUrl = await uploadSignatureToStorage(
+      `${selectedOrder.id}-driver`,
+      driverSignature
+    );
+
+    // 2️⃣ Generar hashes
+    const signatureHash = await generateSHA256Hash(signature);
+    const driverSignatureHash = await generateSHA256Hash(driverSignature);
+
+    // 3️⃣ Generar PDF legal
+    let legalPdfUrl = "";
+    try {
+      const pdfBlob = await generateDeliveryPDF({
+        orderId: selectedOrder.id,
+        customerName: selectedOrder.customerName,
+        driverName: driverName || "",
+        pumpNumbers: selectedOrder.pumpNumbers,
+        deliveredAt: deliveredAtISO,
+        ip,
+        lat: location.lat,
+        lng: location.lng,
+        signatureUrl,
+        driverSignatureUrl,
+      });
+
+      const pdfRef = storageRef(storage, `delivery_pdfs/${selectedOrder.id}.pdf`);
+      await uploadBytes(pdfRef, pdfBlob);
+      legalPdfUrl = await getDownloadURL(pdfRef);
+    } catch (err) {
+      console.error("Failed to generate or upload PDF:", err);
+    }
+
+    // 4️⃣ Guardar en collection de firmas (solo URL + hash + meta)
     await addDoc(collection(db, "deliverySignatures"), {
       orderId: selectedOrder.id,
       pharmacyId: selectedOrder.pharmacyId,
@@ -255,19 +369,66 @@ export default function DriverDashboardPage() {
       customerAddress: selectedOrder.customerAddress,
       driverId,
       driverName,
-      customerSignature,
-      driverSignature,
+      signatureUrl,
+      signatureHash,
+      driverSignatureUrl,
+      driverSignatureHash,
       deliveredAt: serverTimestamp(),
+      deliveredAtISO,
+      deliveredFromIP: ip,
+      deliveredLatitude: location.lat,
+      deliveredLongitude: location.lng,
+      legalPdfUrl,
     });
 
+    // 5️⃣ Guardar solo URL + hash + meta en la orden (NO base64)
     await updateDoc(doc(db, "orders", selectedOrder.id), {
-      status: "DELIVERED",
+      signatureUrl,
+      signatureHash,
+      driverSignatureUrl,
+      driverSignatureHash,
       deliveredAt: serverTimestamp(),
+      deliveredAtISO,
+      deliveredFromIP: ip,
+      deliveredLatitude: location.lat,
+      deliveredLongitude: location.lng,
+      legalPdfUrl,
+      status: "DELIVERED",
     });
+
+    // Actualizar estado de bombas y registrar movimiento (DELIVERED)
+    for (const pumpNumber of selectedOrder!.pumpNumbers) {
+      const q = query(
+        collection(db, "pumps"),
+        where("pumpNumber", "==", pumpNumber),
+        where("pharmacyId", "==", selectedOrder!.pharmacyId)
+      );
+
+      const snap = await getDocs(q);
+
+      if (!snap.empty) {
+        const pumpDoc = snap.docs[0];
+
+        await updateDoc(doc(db, "pumps", pumpDoc.id), {
+          status: "DELIVERED",
+        });
+
+        await logPumpMovement({
+          pumpId: pumpDoc.id,
+          pumpNumber,
+          pharmacyId: selectedOrder!.pharmacyId,
+          orderId: selectedOrder!.id,
+          action: "DELIVERED",
+          performedById: driverId!,
+          performedByName: driverName!,
+          role: "DRIVER",
+        });
+      }
+    }
 
     setShowDeliveryModal(false);
     setSelectedOrder(null);
-    setCustomerSignature("");
+    setSignature(null);
     setDriverSignature("");
     loadOrders();
   }
@@ -453,18 +614,39 @@ export default function DriverDashboardPage() {
                 Cliente: {selectedOrder.customerName}
               </p>
 
-              <SignatureCanvas
-                label="Firma Cliente"
-                onChange={setCustomerSignature}
+              <DeliverySignature
+                title="Customer Signature"
+                onSave={(dataUrl) => {
+                  setSignature(dataUrl);
+                }}
               />
-              <SignatureCanvas
-                label="Firma Conductor"
-                onChange={setDriverSignature}
+              {signature && (
+                <div className="pt-2">
+                  <p className="text-xs text-white/60">Preview:</p>
+                  <img
+                    src={signature}
+                    alt="Signature preview"
+                    className="w-full h-24 object-contain border border-white/10 rounded mt-1"
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSignature(null)}
+                      className="text-xs px-3 py-1 bg-gray-700 rounded"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+              <DeliverySignature
+                title="Driver Signature"
+                onSave={(dataUrl) => setDriverSignature(dataUrl)}
               />
 
               <button
                 onClick={handleCompleteDelivery}
-                disabled={!customerSignature || !driverSignature}
+                disabled={!signature || !driverSignature}
                 className="w-full bg-green-600 py-2 rounded disabled:opacity-50"
               >
                 CONFIRM DELIVERY

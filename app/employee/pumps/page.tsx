@@ -123,10 +123,11 @@ export default function EmployeePumpsPage() {
         brand: brand || null,
         pharmacyId,
         pharmacyName,
-        createdBy: employeeName,     // UI
-        createdById: employeeId,     // SECURITY / AUDIT
+        createdBy: employeeName,
+        createdById: employeeId,
         active: true,
-        createdAt: serverTimestamp(), // USA (UTC)
+        status: "AVAILABLE", // ✅ NUEVO
+        createdAt: serverTimestamp(),
       });
 
       setPumpNumber("");

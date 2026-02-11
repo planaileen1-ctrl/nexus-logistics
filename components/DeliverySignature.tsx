@@ -10,6 +10,24 @@ type Props = {
 export default function DeliverySignature({ title, onSave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
+  function getPosition(e: any) {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+
+    if (e.touches) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top,
+      };
+    }
+
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  }
 
   function start(e: any) {
     setDrawing(true);
@@ -26,33 +44,44 @@ export default function DeliverySignature({ title, onSave }: Props) {
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d")!;
-    const rect = canvas.getBoundingClientRect();
+    const pos = getPosition(e);
 
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = "#ffffff";
 
-    ctx.lineTo(
-      e.clientX - rect.left,
-      e.clientY - rect.top
-    );
+    ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(
-      e.clientX - rect.left,
-      e.clientY - rect.top
-    );
+    ctx.moveTo(pos.x, pos.y);
+
+    setHasDrawn(true);
   }
 
   function clear() {
     const ctx = canvasRef.current?.getContext("2d");
     ctx?.clearRect(0, 0, 400, 200);
     ctx?.beginPath();
+    setHasDrawn(false);
   }
 
   function save() {
     if (!canvasRef.current) return;
-    onSave(canvasRef.current.toDataURL("image/png"));
+
+    if (!hasDrawn) {
+      alert("Signature is required.");
+      return;
+    }
+
+    const dataUrl = canvasRef.current.toDataURL("image/png");
+
+    // Validación mínima de tamaño
+    if (dataUrl.length < 2000) {
+      alert("Signature is too small or invalid.");
+      return;
+    }
+
+    onSave(dataUrl);
   }
 
   return (
@@ -63,11 +92,14 @@ export default function DeliverySignature({ title, onSave }: Props) {
         ref={canvasRef}
         width={400}
         height={200}
-        className="border border-white/20 rounded bg-black"
+        className="border border-white/20 rounded bg-black touch-none"
         onMouseDown={start}
         onMouseUp={end}
         onMouseMove={draw}
         onMouseLeave={end}
+        onTouchStart={start}
+        onTouchEnd={end}
+        onTouchMove={draw}
       />
 
       <div className="flex gap-2">

@@ -19,7 +19,9 @@ import {
   where,
   serverTimestamp,
 } from "firebase/firestore";
+import { updateDoc, doc } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
+import { logPumpMovement } from "@/lib/pumpLogger";
 
 /* ---------- Types ---------- */
 type Pump = {
@@ -114,7 +116,9 @@ export default function EmployeeOrdersPage() {
   async function loadPumps() {
     const q = query(
       collection(db, "pumps"),
-      where("pharmacyId", "==", pharmacyId)
+      where("pharmacyId", "==", pharmacyId),
+      where("active", "==", true),
+      where("status", "==", "AVAILABLE") // ✅ SOLO DISPONIBLES
     );
 
     const snap = await getDocs(q);
@@ -201,27 +205,40 @@ export default function EmployeeOrdersPage() {
 
       const customer = customers.find((c) => c.id === customerId);
 
-      await addDoc(collection(db, "orders"), {
+      const orderRef = await addDoc(collection(db, "orders"), {
         pharmacyId,
         pharmacyName,
-
         pumpIds,
         pumpNumbers,
-
         customerId,
-        customerName: customer?.name || "",
-        customerCity: customer?.city || "",
-
-        customerAddress: customer?.address || "",
-        customerState: customer?.state || "",
-        customerCountry: customer?.country || "",
-
-        createdByEmployeeId: employeeId,
+        customerName: customers.find(c => c.id === customerId)?.name,
+        customerCity: customers.find(c => c.id === customerId)?.city,
+        customerAddress: customers.find(c => c.id === customerId)?.address,
+        customerState: customers.find(c => c.id === customerId)?.state,
+        customerCountry: customers.find(c => c.id === customerId)?.country,
         createdByEmployeeName: employeeName,
-
-        status: "PENDING",
+        createdByEmployeeId: employeeId,
+        status: "CREATED",
         createdAt: serverTimestamp(),
       });
+
+      // ✅ ACTUALIZAR ESTADO DE CADA PUMP
+      for (let i = 0; i < pumpIds.length; i++) {
+        await updateDoc(doc(db, "pumps", pumpIds[i]), {
+          status: "ASSIGNED",
+        });
+
+        await logPumpMovement({
+          pumpId: pumpIds[i],
+          pumpNumber: pumpNumbers[i],
+          pharmacyId: pharmacyId!,
+          orderId: orderRef.id,
+          action: "ASSIGNED",
+          performedById: employeeId!,
+          performedByName: employeeName!,
+          role: "EMPLOYEE",
+        });
+      }
 
       setPumpIds([]);
       setPumpNumbers([]);
