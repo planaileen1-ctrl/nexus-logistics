@@ -29,7 +29,6 @@ import { generateSHA256Hash } from "@/lib/hashSignature";
 import { generateDeliveryPDF } from "@/lib/generateDeliveryPDF";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 /* ---------- Types ---------- */
 type Pharmacy = {
@@ -159,9 +158,6 @@ export default function DriverDashboardPage() {
   const [connectedPharmacies, setConnectedPharmacies] = useState<Pharmacy[]>([]);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-  const [rawOrders, setRawOrders] = useState<any[]>([]);
-  const [showRawOrders, setShowRawOrders] = useState(false);
-  const [authUser, setAuthUser] = useState<any>(null);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
@@ -179,21 +175,6 @@ export default function DriverDashboardPage() {
       await ensureAnonymousAuth();
       if (driverId) loadConnectedPharmacies();
     })();
-  }, []);
-
-  // Monitor auth state and expose for debugging
-  useEffect(() => {
-    try {
-      const auth = getAuth();
-      const unsub = onAuthStateChanged(auth, (u) => {
-        console.log("[Driver] auth state changed:", u);
-        setAuthUser(u);
-      });
-
-      return () => unsub();
-    } catch (err) {
-      console.warn("Auth debug init failed:", err);
-    }
   }, []);
 
   async function loadConnectedPharmacies() {
@@ -214,7 +195,6 @@ export default function DriverDashboardPage() {
     // Listen to all orders and filter client-side (simpler and reliable)
     const unsub = onSnapshot(collection(db, "orders"), (snap) => {
       const all = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-      setRawOrders(all);
 
       const available = all.filter(
         (o) => o.status === "PENDING" && pharmacyIds.includes(o.pharmacyId)
@@ -230,8 +210,6 @@ export default function DriverDashboardPage() {
             "ON_WAY_TO_CUSTOMER",
           ].includes(o.status)
       );
-
-      console.log("[Driver] orders snapshot — available:", available.length, "active:", active.length);
 
       setAvailableOrders(available);
       setActiveOrders(active);
@@ -617,32 +595,6 @@ export default function DriverDashboardPage() {
         {/* AVAILABLE ORDERS */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6">
           <h2 className="font-semibold mb-4">Available Orders</h2>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-white/60">Showing orders for connected pharmacies</p>
-            <button
-              onClick={() => setShowRawOrders((s) => !s)}
-              className="text-xs text-white/50 underline"
-            >
-              {showRawOrders ? "Hide debug" : "Show raw orders"}
-            </button>
-          </div>
-
-          {showRawOrders && (
-            <div className="mb-3 bg-black/30 p-3 rounded text-xs">
-              <p className="text-white/70">Connected pharmacyIds: {connectedPharmacies.map(p => p.pharmacyId).join(", ")}</p>
-              <p className="mt-2 text-white/60">Raw orders snapshot ({rawOrders.length}):</p>
-              <ul className="max-h-40 overflow-y-auto mt-1 text-xs space-y-1">
-                {rawOrders.map((o) => (
-                  <li key={o.id} className="border border-white/5 p-2 rounded">
-                    <div><strong>id:</strong> {o.id}</div>
-                    <div><strong>pharmacyId:</strong> {o.pharmacyId}</div>
-                    <div><strong>status:</strong> {o.status}</div>
-                    <div><strong>pumps:</strong> {Array.isArray(o.pumpNumbers) ? o.pumpNumbers.join(", ") : "-"}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           <ul className="space-y-3">
             {availableOrders.map((o) => (
               <li
