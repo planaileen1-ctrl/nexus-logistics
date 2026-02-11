@@ -114,20 +114,42 @@ export default function EmployeeOrdersPage() {
 
   /* ---------- Loaders ---------- */
   async function loadPumps() {
-    const q = query(
+    // Try strict query first (only AVAILABLE)
+    let q = query(
       collection(db, "pumps"),
       where("pharmacyId", "==", pharmacyId),
       where("active", "==", true),
-      where("status", "==", "AVAILABLE") // ✅ SOLO DISPONIBLES
+      where("status", "==", "AVAILABLE")
     );
 
-    const snap = await getDocs(q);
-    setPumps(
-      snap.docs.map((d) => ({
-        id: d.id,
-        pumpNumber: d.data().pumpNumber,
-      }))
-    );
+    let snap = await getDocs(q);
+
+    // Fallback 1: if none found, relax status filter (only active)
+    if (snap.empty) {
+      console.warn("No pumps found with status AVAILABLE, falling back to active=true");
+      q = query(
+        collection(db, "pumps"),
+        where("pharmacyId", "==", pharmacyId),
+        where("active", "==", true)
+      );
+      snap = await getDocs(q);
+    }
+
+    // Fallback 2: if still none, return any pumps for pharmacy
+    if (snap.empty) {
+      console.warn("No active pumps found, falling back to any pumps for pharmacy");
+      q = query(collection(db, "pumps"), where("pharmacyId", "==", pharmacyId));
+      snap = await getDocs(q);
+    }
+
+    const list = snap.docs.map((d) => ({
+      id: d.id,
+      pumpNumber: (d.data() as any).pumpNumber || String((d.data() as any).pump || ""),
+    }));
+
+    if (list.length === 0) console.info("loadPumps: no pumps returned for pharmacy", pharmacyId);
+
+    setPumps(list);
   }
 
   async function loadCustomers() {
