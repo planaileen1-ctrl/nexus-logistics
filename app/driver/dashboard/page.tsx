@@ -153,6 +153,8 @@ export default function DriverDashboardPage() {
       : "UNKNOWN";
 
   const [pharmacyPin, setPharmacyPin] = useState("");
+  const [addPharmacyError, setAddPharmacyError] = useState("");
+  const [addPharmacyInfo, setAddPharmacyInfo] = useState("");
   const [connectedPharmacies, setConnectedPharmacies] = useState<Pharmacy[]>([]);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
@@ -231,6 +233,18 @@ export default function DriverDashboardPage() {
   }, [connectedPharmacies, driverId]);
 
   async function handleAddPharmacy() {
+    setAddPharmacyError("");
+    setAddPharmacyInfo("");
+    if (!driverId) {
+      setAddPharmacyError("Driver ID missing — login required.");
+      return;
+    }
+
+    if (!pharmacyPin || pharmacyPin.trim().length === 0) {
+      setAddPharmacyError("Enter a valid PIN.");
+      return;
+    }
+
     setLoading(true);
     try {
       const q = query(
@@ -239,16 +253,45 @@ export default function DriverDashboardPage() {
         where("active", "==", true)
       );
       const snap = await getDocs(q);
+
+      if (snap.empty) {
+        setAddPharmacyError("PIN inválido o farmacia no activa.");
+        return;
+      }
+
       const p = snap.docs[0];
+
+      // Check duplicate
+      const dupQ = query(
+        collection(db, "drivers", driverId!, "pharmacies"),
+        where("pharmacyId", "==", p.id)
+      );
+      const dupSnap = await getDocs(dupQ);
+      if (!dupSnap.empty) {
+        setAddPharmacyInfo("Ya estás conectado a esa farmacia.");
+        setPharmacyPin("");
+        loadConnectedPharmacies();
+        return;
+      }
+
       await addDoc(collection(db, "drivers", driverId!, "pharmacies"), {
         pharmacyId: p.id,
         ...p.data(),
         connectedAt: serverTimestamp(),
       });
+
+      setAddPharmacyInfo("Conectado a la farmacia correctamente.");
       setPharmacyPin("");
       loadConnectedPharmacies();
+    } catch (err) {
+      console.error("handleAddPharmacy error:", err);
+      setAddPharmacyError("Error al conectar con la farmacia.");
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        setAddPharmacyInfo("");
+        setAddPharmacyError("");
+      }, 6000);
     }
   }
 
@@ -473,6 +516,26 @@ export default function DriverDashboardPage() {
           >
             CONNECT PHARMACY
           </button>
+          {addPharmacyError && (
+            <p className="text-red-400 text-sm">{addPharmacyError}</p>
+          )}
+          {addPharmacyInfo && (
+            <p className="text-green-400 text-sm">{addPharmacyInfo}</p>
+          )}
+
+          {connectedPharmacies.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-white/60">Connected Pharmacies:</p>
+              <ul className="text-sm space-y-1 mt-1">
+                {connectedPharmacies.map((p) => (
+                  <li key={p.id} className="flex justify-between">
+                    <span>{p.pharmacyName || p.pharmacyId}</span>
+                    <span className="text-xs text-white/50">{p.city || ""}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* ACTIVE ORDERS */}
