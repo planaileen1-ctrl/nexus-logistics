@@ -116,7 +116,6 @@ export default function EmployeeOrdersPage() {
   const [customerId, setCustomerId] = useState("");
   const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
   const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
-  const [showOrdersActivity, setShowOrdersActivity] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -144,17 +143,6 @@ export default function EmployeeOrdersPage() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const view = new URLSearchParams(window.location.search).get("view");
-    if (view === "activity") {
-      setShowOrdersActivity(true);
-    } else if (view === "orders") {
-      setShowOrdersActivity(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -479,17 +467,6 @@ export default function EmployeeOrdersPage() {
     focusPumpSearchInput();
   }
 
-  const activityOrders = [...orders].sort((a, b) => {
-    const toMs = (ts: any) => {
-      if (!ts) return 0;
-      if (typeof ts === "string") return new Date(ts).getTime();
-      if (ts?.toDate) return ts.toDate().getTime();
-      return 0;
-    };
-
-    return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
-  });
-
   const filteredOrders = orders.filter((o) => {
     const term = orderSearch.trim().toLowerCase();
     const normalizedTerm = normalizePumpScannerInput(orderSearch).toLowerCase();
@@ -695,29 +672,10 @@ export default function EmployeeOrdersPage() {
           </button>
         </div>
 
-        {/* ORDERS ACTIVITY */}
-        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="font-semibold">Orders Activity</h2>
-              <p className="text-xs text-white/60">
-                Live updates from registered orders
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowOrdersActivity(true)}
-              className="text-xs px-3 py-2 rounded bg-white/10 hover:bg-white/20"
-            >
-              View Activity
-            </button>
-          </div>
-        </div>
-
         {/* ORDERS LIST */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6">
           <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="font-semibold">New Orders</h2>
+            <h2 className="font-semibold">Orders</h2>
             <div className="relative w-full md:max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
                 <svg
@@ -805,67 +763,6 @@ export default function EmployeeOrdersPage() {
             ))}
           </ul>
         </div>
-
-        {/* DRIVER ACTIVITY MODAL */}
-        {showOrdersActivity && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center px-4">
-            <div className="bg-[#020617] w-full max-w-3xl rounded-xl p-6 space-y-4 border border-white/10">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Orders Activity</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowOrdersActivity(false)}
-                  className="text-xs text-white/60 hover:text-white"
-                >
-                  Close
-                </button>
-              </div>
-
-              {activityOrders.length === 0 && (
-                <p className="text-xs text-white/60">No activity yet.</p>
-              )}
-
-              <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                {activityOrders.map((o) => (
-                  <li
-                    key={o.id}
-                    className="border border-white/10 rounded p-4 space-y-1"
-                  >
-                    {(() => {
-                      const effectiveStatus = getEffectiveOrderStatus(o);
-
-                      return (
-                        <>
-                    <p className="text-sm font-semibold">
-                      {o.customerName} — Pumps: {o.pumpNumbers?.join(", ")}
-                    </p>
-                    <p className="text-xs text-white/60">
-                      Driver: {o.driverName || "Unassigned"}
-                    </p>
-                    <p className="text-xs">
-                      Status:{" "}
-                      <span
-                        className={
-                          effectiveStatus === "DELIVERED"
-                            ? "text-green-400"
-                            : "text-yellow-400"
-                        }
-                      >
-                        {effectiveStatus}
-                      </span>
-                    </p>
-                    <p className="text-xs text-white/50">
-                      Last update: {formatDate(o.statusUpdatedAt || o.createdAt)}
-                    </p>
-                        </>
-                      );
-                    })()}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
 
         <div className="text-center">
           <button
