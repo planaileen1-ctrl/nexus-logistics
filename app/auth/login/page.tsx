@@ -153,32 +153,59 @@ export default function LoginPage() {
   ===================== */
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#020617] text-white">
-      <div className="flex flex-col items-center gap-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white overflow-hidden">
+      
+      {/* Background decorations */}
+      <div className="fixed top-0 left-0 w-96 h-96 bg-emerald-500/10 blur-3xl rounded-full -z-10 animate-pulse" style={{ animationDuration: "4s" }} />
+      <div className="fixed bottom-0 right-0 w-96 h-96 bg-indigo-500/5 blur-3xl rounded-full -z-10" />
+      
+      <div className="flex flex-col items-center gap-8">
+
+        {/* TITLE */}
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
+            Sign In
+          </h1>
+          <p className="text-sm text-slate-400">Enter your 4-digit PIN</p>
+        </div>
 
         {/* PIN DOTS */}
-        <div className="flex gap-3">
+        <div className="flex gap-4">
           {[0, 1, 2, 3].map((i) => (
             <div
               key={i}
-              className={`w-4 h-4 rounded-full border ${
+              className={`w-5 h-5 rounded-full border-2 transition-all duration-300 ${
                 pin.length > i
-                  ? "bg-green-400 border-green-400"
-                  : "border-white/30"
+                  ? "bg-emerald-400 border-emerald-400 shadow-lg shadow-emerald-400/50 scale-110"
+                  : "border-slate-600 hover:border-slate-400"
               }`}
             />
           ))}
         </div>
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {/* ERROR MESSAGE */}
+        {error && (
+          <div className="bg-red-500/15 border border-red-500/40 rounded-lg px-4 py-2 text-sm text-red-300 animate-in fade-in duration-300">
+            {error}
+          </div>
+        )}
 
         {/* KEYPAD */}
-        <div className="grid grid-cols-3 gap-4 bg-black/40 p-6 rounded-xl">
+        <div className="grid grid-cols-3 gap-3 bg-gradient-to-br from-slate-800/50 to-slate-900/50 p-7 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
           {["1","2","3","4","5","6","7","8","9","C","0","OK"].map((key) => (
             <button
               key={key}
               onClick={() => handlePress(key)}
-              className="w-16 h-14 rounded-lg bg-black/60 hover:bg-black border border-white/10 text-lg font-semibold"
+              disabled={key === "OK" && pin.length !== 4}
+              className={`w-16 h-14 rounded-xl font-bold text-lg transition-all duration-200 ${
+                key === "C"
+                  ? "bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30"
+                  : key === "OK"
+                  ? pin.length === 4
+                    ? "bg-emerald-500/80 hover:bg-emerald-500 text-white border border-emerald-400/50 shadow-lg shadow-emerald-500/30"
+                    : "bg-slate-700/30 text-slate-500 border border-slate-600/30 cursor-not-allowed"
+                  : "bg-slate-700/40 hover:bg-slate-600/60 text-white border border-slate-600/50 hover:shadow-lg hover:shadow-slate-500/20 hover:scale-105 active:scale-95"
+              }`}
             >
               {key}
             </button>
@@ -187,9 +214,9 @@ export default function LoginPage() {
 
         <button
           onClick={() => router.replace("/")}
-          className="text-xs opacity-60 hover:opacity-100"
+          className="text-xs uppercase tracking-widest text-slate-500 hover:text-emerald-400 transition-colors duration-300 font-semibold mt-4"
         >
-          ← BACK
+          ← BACK TO HOME
         </button>
       </div>
     </div>
