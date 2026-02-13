@@ -28,6 +28,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
+import { normalizePumpScannerInput } from "@/lib/pumpScanner";
 
 /* 🔹 Helper: format Firestore timestamp to USA date */
 function formatDate(ts: any) {
@@ -171,8 +172,8 @@ export default function EmployeePumpsPage() {
 
           <input
             value={pumpNumber}
-            onChange={(e) => setPumpNumber(e.target.value)}
-            placeholder="Pump Number (required)"
+            onChange={(e) => setPumpNumber(normalizePumpScannerInput(e.target.value))}
+            placeholder="Pump Number (type or scan barcode/QR)"
             className="w-full p-2 rounded bg-black border border-white/10"
           />
 

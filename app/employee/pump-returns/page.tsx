@@ -22,6 +22,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
+import { normalizePumpScannerInput } from "@/lib/pumpScanner";
 
 type ReturnOrder = {
   id: string;
@@ -63,6 +64,7 @@ export default function PumpReturnsPage() {
   const [info, setInfo] = useState("");
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "returned">("all");
+  const [pumpSearch, setPumpSearch] = useState("");
 
   useEffect(() => {
     let unsubscribe: null | (() => void) = null;
@@ -115,7 +117,20 @@ export default function PumpReturnsPage() {
     return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
   });
 
-  const filteredOrders = sortedOrders.filter((order) => {
+  const filteredByPump = sortedOrders.filter((order) => {
+    const normalizedSearch = normalizePumpScannerInput(pumpSearch);
+    if (!normalizedSearch) return true;
+
+    const previous = order.previousPumps || order.customerPreviousPumps || [];
+    const statusNumbers = (order.previousPumpsStatus || []).map((entry) => entry.pumpNumber);
+    const all = [...previous, ...statusNumbers];
+
+    return all.some((num) =>
+      String(num).toUpperCase().includes(normalizedSearch)
+    );
+  });
+
+  const filteredOrders = filteredByPump.filter((order) => {
     if (filter === "all") return true;
 
     const pumps = order.previousPumpsStatus || [];
@@ -220,6 +235,13 @@ export default function PumpReturnsPage() {
         {info && <p className="text-green-400 text-sm text-center">{info}</p>}
 
         <div className="flex flex-wrap items-center justify-center gap-2">
+          <input
+            value={pumpSearch}
+            onChange={(e) => setPumpSearch(e.target.value)}
+            placeholder="Search pump (type or scan barcode/QR)..."
+            className="w-full max-w-md px-3 py-2 rounded bg-black/30 border border-white/10 text-xs"
+          />
+
           <button
             type="button"
             onClick={() => setFilter("all")}

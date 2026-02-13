@@ -11,7 +11,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -25,6 +25,7 @@ import {
 import { updateDoc, doc } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
+import { normalizePumpScannerInput } from "@/lib/pumpScanner";
 
 /* ---------- Types ---------- */
 type Pump = {
@@ -112,6 +113,7 @@ export default function EmployeeOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const pumpSearchRef = useRef<HTMLInputElement>(null);
 
   /* ---------- Init ---------- */
   useEffect(() => {
@@ -368,9 +370,63 @@ export default function EmployeeOrdersPage() {
   /* ---------- Derived ---------- */
   const filteredPumps = pumps.filter(
     (p) =>
-      p.pumpNumber.toLowerCase().includes(pumpSearch.toLowerCase()) &&
+      p.pumpNumber.toLowerCase().includes(normalizePumpScannerInput(pumpSearch).toLowerCase()) &&
       !pumpIds.includes(p.id)
   );
+
+  function focusPumpSearchInput() {
+    setTimeout(() => {
+      pumpSearchRef.current?.focus();
+    }, 0);
+  }
+
+  function addPumpFromScannedValue(rawValue: string) {
+    const normalized = normalizePumpScannerInput(rawValue);
+    if (!normalized) return;
+
+    const exact = pumps.find(
+      (p) => p.pumpNumber.toUpperCase() === normalized && !pumpIds.includes(p.id)
+    );
+
+    const candidate =
+      exact ||
+      pumps.find(
+        (p) =>
+          p.pumpNumber.toUpperCase().includes(normalized) &&
+          !pumpIds.includes(p.id)
+      );
+
+    if (!candidate) {
+      setError(`Pump not found: ${normalized}`);
+      return;
+    }
+
+    setPumpIds((prev) => [...prev, candidate.id]);
+    setPumpNumbers((prev) => [...prev, candidate.pumpNumber]);
+    setPumpSearch("");
+    setError("");
+    focusPumpSearchInput();
+  }
+
+  function handlePumpScannerEnter() {
+    addPumpFromScannedValue(pumpSearch);
+  }
+
+  function handlePumpScannerBatch(rawValue: string) {
+    const parts = rawValue
+      .split(/[\r\n\t,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (parts.length <= 1) {
+      setPumpSearch(rawValue);
+      return;
+    }
+
+    parts.forEach((part) => addPumpFromScannedValue(part));
+    setPumpSearch("");
+    focusPumpSearchInput();
+  }
 
   const activityOrders = [...orders].sort((a, b) => {
     const toMs = (ts: any) => {
@@ -385,11 +441,12 @@ export default function EmployeeOrdersPage() {
 
   const filteredOrders = orders.filter((o) => {
     const term = orderSearch.trim().toLowerCase();
+    const normalizedTerm = normalizePumpScannerInput(orderSearch).toLowerCase();
     if (!term) return true;
 
     const customerMatch = o.customerName?.toLowerCase().includes(term);
     const pumpMatch = (o.pumpNumbers || []).some((num) =>
-      String(num).toLowerCase().includes(term)
+      String(num).toLowerCase().includes(normalizedTerm || term)
     );
 
     return customerMatch || pumpMatch;
@@ -412,10 +469,24 @@ export default function EmployeeOrdersPage() {
           <h2 className="font-semibold">Create New Order</h2>
 
           <input
+            ref={pumpSearchRef}
             value={pumpSearch}
-            onChange={(e) => setPumpSearch(e.target.value)}
-            placeholder="Search pump number..."
+            onChange={(e) => handlePumpScannerBatch(e.target.value)}
+            onPaste={(e) => {
+              const pasted = e.clipboardData.getData("text");
+              if (!pasted) return;
+              e.preventDefault();
+              handlePumpScannerBatch(pasted);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handlePumpScannerEnter();
+              }
+            }}
+            placeholder="Search pump (type or scan barcode/QR)..."
             className="w-full p-2 rounded bg-black border border-white/10"
+            autoFocus
           />
 
           {pumpSearch && (
@@ -434,6 +505,7 @@ export default function EmployeeOrdersPage() {
                     setPumpIds((prev) => [...prev, p.id]);
                     setPumpNumbers((prev) => [...prev, p.pumpNumber]);
                     setPumpSearch("");
+                    focusPumpSearchInput();
                   }}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-white/10"
                 >
@@ -569,7 +641,7 @@ export default function EmployeeOrdersPage() {
               <input
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Search by customer or pump..."
+                placeholder="Search by customer or pump (barcode/QR supported)..."
                 className="w-full p-2 pl-9 rounded bg-black border border-white/10"
               />
             </div>
