@@ -152,6 +152,7 @@ function SignatureCanvas({
   };
 
   const start = (e: any) => {
+    if (e?.cancelable) e.preventDefault();
     drawing.current = true;
     const ctx = canvasRef.current!.getContext("2d")!;
     const { x, y } = pos(e);
@@ -160,6 +161,7 @@ function SignatureCanvas({
   };
 
   const move = (e: any) => {
+    if (e?.cancelable) e.preventDefault();
     if (!drawing.current) return;
     const ctx = canvasRef.current!.getContext("2d")!;
     const { x, y } = pos(e);
@@ -185,7 +187,7 @@ function SignatureCanvas({
         ref={canvasRef}
         width={320}
         height={120}
-        className="border border-white/20 rounded bg-black"
+        className="border border-white/20 rounded bg-black touch-none"
         onMouseDown={start}
         onMouseMove={move}
         onMouseUp={end}

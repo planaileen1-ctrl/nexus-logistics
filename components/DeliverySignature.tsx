@@ -35,6 +35,7 @@ export default function DeliverySignature({
   }
 
   function start(e: any) {
+    if (e?.cancelable) e.preventDefault();
     setDrawing(true);
     draw(e);
   }
@@ -49,6 +50,7 @@ export default function DeliverySignature({
   }
 
   function draw(e: any) {
+    if (e?.cancelable) e.preventDefault();
     if (!drawing || !canvasRef.current) return;
 
     const canvas = canvasRef.current;

@@ -67,16 +67,16 @@ export default function EmployeeDashboardPage() {
     : "--";
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white px-4 py-8 overflow-hidden">
+    <main className="h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white px-4 py-4 overflow-hidden">
       
       {/* Background decorations */}
       <div className="fixed top-0 left-0 w-96 h-96 bg-emerald-500/8 blur-3xl rounded-full -z-10" />
       <div className="fixed bottom-0 right-0 w-96 h-96 bg-indigo-500/8 blur-3xl rounded-full -z-10" />
       
-      <div className="w-full max-w-5xl mx-auto space-y-10">
+      <div className="w-full max-w-6xl h-full mx-auto flex flex-col gap-4">
 
         {/* HEADER */}
-        <div className="text-center space-y-2 pt-4">
+        <div className="text-center space-y-1">
           <h1 className="text-4xl font-black bg-gradient-to-r from-white via-emerald-100 to-white bg-clip-text text-transparent">
             Employee Dashboard
           </h1>
@@ -85,7 +85,7 @@ export default function EmployeeDashboardPage() {
           </p>
         </div>
 
-        <div className="bg-gradient-to-r from-slate-900/70 to-slate-800/40 border border-slate-700/60 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="bg-gradient-to-r from-slate-900/70 to-slate-800/40 border border-slate-700/60 rounded-2xl p-3 md:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-widest text-emerald-300/90 font-semibold">
               Session
@@ -109,14 +109,15 @@ export default function EmployeeDashboardPage() {
           </button>
         </div>
 
-        {/* CARDS GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="flex-1 min-h-0">
+          {/* CARDS GRID */}
+          <div className="h-full overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
 
           {/* MEDICAL PUMPS */}
           <button
             onClick={() => router.push("/employee/pumps")}
             className="group cursor-pointer bg-gradient-to-br from-indigo-500/15 to-indigo-600/5 border border-indigo-500/40 hover:border-indigo-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-indigo-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-indigo-500/20"
           >
             <div className="space-y-4">
               <div className="text-indigo-300 text-4xl group-hover:scale-110 transition-transform">🏥</div>
@@ -132,7 +133,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/customers")}
             className="group cursor-pointer bg-gradient-to-br from-emerald-500/15 to-emerald-600/5 border border-emerald-500/40 hover:border-emerald-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-emerald-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-emerald-500/20"
           >
             <div className="space-y-4">
               <div className="text-emerald-300 text-4xl group-hover:scale-110 transition-transform">👥</div>
@@ -148,7 +149,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/orders?view=create")}
             className="group cursor-pointer bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/40 hover:border-amber-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-amber-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/20"
           >
             <div className="space-y-4">
               <div className="text-amber-300 text-4xl group-hover:scale-110 transition-transform">📦</div>
@@ -164,7 +165,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/pumps-manager")}
             className="group cursor-pointer bg-gradient-to-br from-blue-500/15 to-blue-600/5 border border-blue-500/40 hover:border-blue-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-blue-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20"
           >
             <div className="space-y-4">
               <div className="text-blue-300 text-4xl group-hover:scale-110 transition-transform">🧪</div>
@@ -180,7 +181,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/pump-returns")}
             className="group cursor-pointer bg-gradient-to-br from-rose-500/15 to-rose-600/5 border border-rose-500/40 hover:border-rose-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-rose-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-rose-500/20"
           >
             <div className="space-y-4">
               <div className="text-rose-300 text-4xl group-hover:scale-110 transition-transform">↩️</div>
@@ -196,7 +197,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/pump-maintenance")}
             className="group cursor-pointer bg-gradient-to-br from-lime-500/15 to-lime-600/5 border border-lime-500/40 hover:border-lime-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-lime-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-lime-500/20"
           >
             <div className="space-y-4">
               <div className="text-lime-300 text-4xl group-hover:scale-110 transition-transform">🧰</div>
@@ -212,7 +213,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/orders?view=activity")}
             className="group cursor-pointer bg-gradient-to-br from-cyan-500/15 to-cyan-600/5 border border-cyan-500/40 hover:border-cyan-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-cyan-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/20"
           >
             <div className="space-y-4">
               <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">🚚</div>
@@ -228,7 +229,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/delivery-pdfs")}
             className="group cursor-pointer bg-gradient-to-br from-cyan-500/15 to-cyan-600/5 border border-cyan-500/40 hover:border-cyan-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-cyan-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-cyan-500/20"
           >
             <div className="space-y-4">
               <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">📄</div>
@@ -244,7 +245,7 @@ export default function EmployeeDashboardPage() {
           <button
             onClick={() => router.push("/employee/driver-tracking")}
             className="group cursor-pointer bg-gradient-to-br from-red-500/15 to-red-600/5 border border-red-500/40 hover:border-red-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-red-500/20"
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-red-500/20"
           >
             <div className="space-y-4">
               <div className="text-red-300 text-4xl group-hover:scale-110 transition-transform">📍</div>
@@ -256,20 +257,19 @@ export default function EmployeeDashboardPage() {
             </div>
           </button>
 
+          </div>
         </div>
 
-        {/* INFO NOTE */}
-        <div className="bg-gradient-to-r from-emerald-500/10 to-slate-500/5 border border-emerald-500/20 rounded-xl p-4 text-center">
-          <p className="text-xs text-slate-300 font-medium">
-            💡 Orders created here are visible to drivers by city and pharmacy. Track all logistics in real-time.
-          </p>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] items-center gap-2">
+          <div className="bg-gradient-to-r from-emerald-500/10 to-slate-500/5 border border-emerald-500/20 rounded-xl px-3 py-2 text-center md:text-left">
+            <p className="text-[11px] text-slate-300 font-medium">
+              Orders created here are visible to drivers by city and pharmacy.
+            </p>
+          </div>
 
-        {/* BACK */}
-        <div className="text-center pt-4">
           <button
             onClick={() => router.back()}
-            className="text-sm text-slate-500 hover:text-slate-300 transition-colors font-semibold uppercase tracking-wide"
+            className="text-sm text-slate-500 hover:text-slate-300 transition-colors font-semibold uppercase tracking-wide justify-self-center md:justify-self-end"
           >
             ← Back
           </button>
