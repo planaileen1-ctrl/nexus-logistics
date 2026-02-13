@@ -64,10 +64,14 @@ type Order = {
   driverId?: string;
   driverName?: string;
   createdAt: any;
+  statusUpdatedAt?: any;
   assignedAt?: any;
   startedAt?: any;
   arrivedAt?: any;
   arrivedAtISO?: string;
+  deliveredAt?: any;
+  deliveredAtISO?: string;
+  legalPdfUrl?: string;
   driverLatitude?: number;
   driverLongitude?: number;
 };
@@ -196,6 +200,7 @@ export default function DriverDashboardPage() {
   const [returnTasks, setReturnTasks] = useState<
     { orderId: string; customerName: string; pumps: string[] }[]
   >([]);
+  const [deliveryBackups, setDeliveryBackups] = useState<Order[]>([]);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
@@ -215,6 +220,8 @@ export default function DriverDashboardPage() {
   const [deliveryError, setDeliveryError] = useState("");
   const [deliveryInfo, setDeliveryInfo] = useState("");
   const [acceptInfo, setAcceptInfo] = useState("");
+  const [pdfEmailByOrder, setPdfEmailByOrder] = useState<Record<string, string>>({});
+  const [pdfSendingByOrder, setPdfSendingByOrder] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
@@ -285,9 +292,32 @@ export default function DriverDashboardPage() {
         })
         .filter((entry) => entry.pumps.length > 0);
 
+      const backups = all
+        .filter(
+          (o) =>
+            o.driverId === driverId &&
+            !!o.legalPdfUrl &&
+            (o.status === "DELIVERED" || o.deliveredAt || o.deliveredAtISO)
+        )
+        .sort((a, b) => {
+          const toMs = (ts: any) => {
+            if (!ts) return 0;
+            if (typeof ts === "string") return new Date(ts).getTime();
+            if (ts?.toDate) return ts.toDate().getTime();
+            return 0;
+          };
+
+          return (
+            toMs(b.deliveredAt || b.deliveredAtISO || b.statusUpdatedAt || b.createdAt) -
+            toMs(a.deliveredAt || a.deliveredAtISO || a.statusUpdatedAt || a.createdAt)
+          );
+        })
+        .slice(0, 10);
+
       setAvailableOrders(available);
       setActiveOrders(active);
       setReturnTasks(tasks);
+      setDeliveryBackups(backups);
     });
 
     return unsub;
@@ -731,6 +761,46 @@ export default function DriverDashboardPage() {
     }
   }
 
+  async function handleSharePdfByEmail(order: Order) {
+    if (!order.legalPdfUrl) {
+      setDeliveryError("PDF is not available yet.");
+      return;
+    }
+
+    const normalizedTo = (pdfEmailByOrder[order.id] || "").trim();
+    if (!normalizedTo) {
+      setDeliveryError("Please enter recipient email first.");
+      return;
+    }
+
+    if (!normalizedTo.includes("@")) {
+      setDeliveryError("Please enter a valid email address.");
+      return;
+    }
+
+    setDeliveryError("");
+    setPdfSendingByOrder((prev) => ({ ...prev, [order.id]: true }));
+
+    try {
+      await sendAppEmail({
+        to: normalizedTo,
+        subject: `Delivery PDF - Order ${order.id}`,
+        html: `
+          <p>Hello,</p>
+          <p>Here is the legal delivery PDF backup for order <strong>${order.id}</strong>.</p>
+          <p><a href="${order.legalPdfUrl}" target="_blank" rel="noreferrer">Open Delivery PDF</a></p>
+        `,
+        text: `Delivery PDF backup for order ${order.id}: ${order.legalPdfUrl}`,
+      });
+
+      setDeliveryInfo(`PDF shared by email to ${normalizedTo}.`);
+      setPdfEmailByOrder((prev) => ({ ...prev, [order.id]: "" }));
+      setTimeout(() => setDeliveryInfo(""), 6000);
+    } finally {
+      setPdfSendingByOrder((prev) => ({ ...prev, [order.id]: false }));
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10">
       <div className="w-full max-w-xl space-y-8">
@@ -877,6 +947,54 @@ export default function DriverDashboardPage() {
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* DELIVERY PDF BACKUPS */}
+        <div className="bg-black/40 border border-cyan-500/30 rounded-xl p-6">
+          <h2 className="font-semibold mb-4 text-cyan-300">Delivery PDF Backups</h2>
+          {deliveryBackups.length === 0 && (
+            <p className="text-xs text-white/60">No delivery PDFs available yet.</p>
+          )}
+          {deliveryBackups.length > 0 && (
+            <ul className="space-y-3">
+              {deliveryBackups.map((o) => (
+                <li
+                  key={`pdf-${o.id}`}
+                  className="border border-cyan-500/20 rounded p-4 space-y-1"
+                >
+                  <p className="text-sm font-semibold">{o.customerName}</p>
+                  <p className="text-xs text-white/60">
+                    Delivered: {new Date(o.deliveredAtISO || o.createdAt?.toDate?.() || Date.now()).toLocaleString("en-US")}
+                  </p>
+                  <a
+                    href={o.legalPdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-500"
+                  >
+                    VIEW PDF
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleSharePdfByEmail(o)}
+                    disabled={pdfSendingByOrder[o.id] === true}
+                    className="ml-2 text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60"
+                  >
+                    {pdfSendingByOrder[o.id] ? "SENDING..." : "SHARE BY EMAIL"}
+                  </button>
+                  <input
+                    type="email"
+                    value={pdfEmailByOrder[o.id] || ""}
+                    onChange={(e) =>
+                      setPdfEmailByOrder((prev) => ({ ...prev, [o.id]: e.target.value }))
+                    }
+                    placeholder="recipient@email.com"
+                    className="mt-2 w-full p-2 rounded bg-black border border-white/10 text-xs"
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* AVAILABLE ORDERS */}
