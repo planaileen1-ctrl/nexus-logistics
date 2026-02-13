@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LayoutDashboard, Truck, RotateCcw, Link2, FileText, PackageOpen } from "lucide-react";
 import {
   collection,
   getDocs,
@@ -246,6 +247,9 @@ export default function DriverDashboardPage() {
   const [deliveryError, setDeliveryError] = useState("");
   const [deliveryInfo, setDeliveryInfo] = useState("");
   const [acceptInfo, setAcceptInfo] = useState("");
+  const [dashboardSection, setDashboardSection] = useState<
+    "home" | "active" | "returns" | "connect"
+  >("home");
 
   useEffect(() => {
     (async () => {
@@ -760,9 +764,16 @@ export default function DriverDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10">
-      <div className="w-full max-w-xl space-y-8">
-        <h1 className="text-2xl font-bold text-center">Driver Dashboard</h1>
+    <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
+      <div className="w-full max-w-5xl space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
+            Driver Dashboard
+          </h1>
+          <p className="text-xs text-white/50 uppercase tracking-widest font-semibold">
+            {driverName || "Driver"}
+          </p>
+        </div>
 
         {deliveryInfo && (
           <p className="text-green-400 text-sm text-center">
@@ -776,21 +787,98 @@ export default function DriverDashboardPage() {
           </p>
         )}
 
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          <button
+            type="button"
+            onClick={() => setDashboardSection("home")}
+            className={`py-2 rounded-lg text-xs font-semibold border ${
+              dashboardSection === "home"
+                ? "bg-white/15 border-white/40"
+                : "bg-black/30 border-white/10 hover:border-white/30"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <LayoutDashboard size={14} />
+              DASHBOARD
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDashboardSection("active")}
+            className={`py-2 rounded-lg text-xs font-semibold border ${
+              dashboardSection === "active"
+                ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-200"
+                : "bg-black/30 border-white/10 hover:border-white/30"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Truck size={14} />
+              ACTIVE
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDashboardSection("returns")}
+            className={`py-2 rounded-lg text-xs font-semibold border ${
+              dashboardSection === "returns"
+                ? "bg-amber-500/20 border-amber-400/50 text-amber-200"
+                : "bg-black/30 border-white/10 hover:border-white/30"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <RotateCcw size={14} />
+              RETURNS
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDashboardSection("connect")}
+            className={`py-2 rounded-lg text-xs font-semibold border ${
+              dashboardSection === "connect"
+                ? "bg-indigo-500/20 border-indigo-400/50 text-indigo-200"
+                : "bg-black/30 border-white/10 hover:border-white/30"
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Link2 size={14} />
+              CONNECT
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/driver/delivery-pdfs")}
+            className="py-2 rounded-lg text-xs font-semibold border bg-cyan-600/30 border-cyan-500/40 hover:bg-cyan-600/40"
+          >
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <FileText size={14} />
+              PDFS
+            </span>
+          </button>
+        </div>
+
         {/* NEW ORDERS */}
-        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
-          <h2 className="font-semibold mb-4">New Orders</h2>
+        <div className="bg-gradient-to-br from-emerald-500/10 to-black/60 border border-emerald-500/30 rounded-2xl p-8 shadow-[0_0_40px_rgba(16,185,129,0.08)]">
+          <div className="flex items-center justify-between mb-5 gap-3">
+            <h2 className="text-2xl font-extrabold inline-flex items-center gap-2">
+              <PackageOpen className="text-emerald-300" size={22} />
+              New Orders
+            </h2>
+            <span className="text-xs px-3 py-1 rounded-full border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 font-semibold">
+              {availableOrders.length} pending
+            </span>
+          </div>
           {availableOrders.length === 0 && (
-            <p className="text-xs text-white/60">No new orders available.</p>
+            <p className="text-sm text-white/60">No new orders available.</p>
           )}
           {availableOrders.length > 0 && (
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {availableOrders.map((o) => (
                 <li
                   key={o.id}
-                  className="border border-white/10 rounded p-4 space-y-2"
+                  className="border border-emerald-500/30 rounded-xl p-5 space-y-3 bg-emerald-500/5"
                 >
-                  <p className="font-semibold">{o.pharmacyName}</p>
-                  <p className="text-sm">Customer: {o.customerName}</p>
+                  <p className="font-semibold text-lg">{o.pharmacyName}</p>
+                  <p className="text-sm text-white/90">{o.customerName}</p>
 
                   {o.customerCity && (
                     <p className="text-xs text-white/60">
@@ -804,13 +892,9 @@ export default function DriverDashboardPage() {
                     </p>
                   )}
 
-                  <p className="text-xs text-yellow-400">
-                    ⚠️ Medical order – complete details available for pickup
-                  </p>
-
                   <button
                     onClick={() => handleAcceptOrder(o.id)}
-                    className="w-full bg-green-600 py-2 rounded"
+                    className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-semibold"
                   >
                     ACCEPT ORDER
                   </button>
@@ -820,151 +904,146 @@ export default function DriverDashboardPage() {
           )}
         </div>
 
-        {/* RETURN TASKS */}
-        <div className="bg-black/40 border border-amber-500/30 rounded-xl p-6">
-          <h2 className="font-semibold mb-4 text-amber-400">Return Tasks</h2>
-          {returnTasks.length === 0 && (
-            <p className="text-xs text-white/60">No pending returns.</p>
-          )}
-          {returnTasks.length > 0 && (
+        {dashboardSection === "active" && (
+          <div className="bg-black/40 border border-green-500/30 rounded-xl p-6">
+            <h2 className="font-semibold mb-4 text-green-300 inline-flex items-center gap-2">
+              <Truck size={16} />
+              My Active Orders
+            </h2>
+            {activeOrders.length === 0 && (
+              <p className="text-xs text-white/60">No active orders.</p>
+            )}
             <ul className="space-y-3">
-              {returnTasks.map((task) => (
+              {activeOrders.map((o) => (
                 <li
-                  key={`${task.orderId}-${task.customerName}`}
-                  className="border border-amber-500/30 rounded p-4 space-y-1"
+                  key={o.id}
+                  className="border border-green-500/30 rounded p-4 space-y-2"
                 >
-                  <p className="text-sm font-semibold">{task.customerName}</p>
-                  <p className="text-xs text-white/60">
-                    Pumps to return: {task.pumps.join(", ")}
-                  </p>
+                  <p className="font-semibold">{o.pharmacyName}</p>
+                  <p>{o.customerName}</p>
+
+                  {o.status === "ASSIGNED" && (
+                    <button
+                      onClick={() => handleOnWayToPharmacy(o.id)}
+                      className="w-full bg-yellow-600 py-2 rounded"
+                    >
+                      ON THE WAY TO PHARMACY
+                    </button>
+                  )}
+
+                  {o.status === "ON_WAY_TO_PHARMACY" && (
+                    <button
+                      onClick={() => {
+                        setSelectedOrder(o);
+                        setShowPickupModal(true);
+                      }}
+                      className="w-full bg-indigo-600 py-2 rounded"
+                    >
+                      ARRIVED AT PHARMACY
+                    </button>
+                  )}
+
+                  {o.status === "ON_WAY_TO_CUSTOMER" && (
+                    <>
+                      {o.arrivedAtISO && (
+                        <p className="text-xs text-white/60">
+                          Arrival: {new Date(o.arrivedAtISO).toLocaleString("en-US")}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleArrivedAtCustomer(o)}
+                        className="w-full bg-green-600 py-2 rounded"
+                      >
+                        ARRIVED AT CUSTOMER
+                      </button>
+                    </>
+                  )}
+
+                  {o.customerPreviousPumps && o.customerPreviousPumps.length > 0 && (
+                    <p className="text-xs text-yellow-300">
+                      Pumps: {o.customerPreviousPumps.join(", ")}
+                    </p>
+                  )}
+
+                  {o.returnReminderNote && (
+                    <p className="text-xs text-yellow-300">
+                      Reminder: {o.returnReminderNote}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* CONNECT PHARMACY */}
-        <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
-          <input
-            value={pharmacyPin}
-            onChange={(e) => setPharmacyPin(e.target.value)}
-            placeholder="Enter 4-digit Pharmacy PIN"
-            maxLength={4}
-            className="w-full p-2 rounded bg-black border border-white/10"
-          />
-          <button
-            onClick={handleAddPharmacy}
-            disabled={loading}
-            className="w-full bg-indigo-600 py-2 rounded"
-          >
-            CONNECT PHARMACY
-          </button>
-          {addPharmacyError && (
-            <p className="text-red-400 text-sm">{addPharmacyError}</p>
-          )}
-          {addPharmacyInfo && (
-            <p className="text-green-400 text-sm">{addPharmacyInfo}</p>
-          )}
-
-          {connectedPharmacies.length > 0 && (
-            <div className="mt-3">
-              <p className="text-xs text-white/60">Connected Pharmacies:</p>
-              <ul className="text-sm space-y-1 mt-1">
-                {connectedPharmacies.map((p) => (
-                  <li key={p.id} className="flex justify-between">
-                    <span>{p.pharmacyName || p.pharmacyId}</span>
-                    <span className="text-xs text-white/50">{p.city || ""}</span>
+        {dashboardSection === "returns" && (
+          <div className="bg-black/40 border border-amber-500/30 rounded-xl p-6">
+            <h2 className="font-semibold mb-4 text-amber-300 inline-flex items-center gap-2">
+              <RotateCcw size={16} />
+              Return Tasks
+            </h2>
+            {returnTasks.length === 0 && (
+              <p className="text-xs text-white/60">No pending returns.</p>
+            )}
+            {returnTasks.length > 0 && (
+              <ul className="space-y-3">
+                {returnTasks.map((task) => (
+                  <li
+                    key={`${task.orderId}-${task.customerName}`}
+                    className="border border-amber-500/30 rounded p-4 space-y-1"
+                  >
+                    <p className="text-sm font-semibold">{task.customerName}</p>
+                    <p className="text-xs text-white/60">
+                      Pumps: {task.pumps.join(", ")}
+                    </p>
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        {/* DELIVERY PDF BACKUPS */}
-        <div className="bg-black/40 border border-cyan-500/30 rounded-xl p-6 space-y-3">
-          <h2 className="font-semibold text-cyan-300">Delivery PDF Backups</h2>
-          <p className="text-xs text-white/60">
-            Open legal delivery PDFs and share by email from a dedicated page.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/driver/delivery-pdfs")}
-            className="w-full bg-cyan-600 py-2 rounded"
-          >
-            OPEN PDF BACKUPS
-          </button>
-        </div>
+        {dashboardSection === "connect" && (
+          <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
+            <h2 className="font-semibold text-indigo-300 inline-flex items-center gap-2">
+              <Link2 size={16} />
+              Connect Pharmacy
+            </h2>
+            <input
+              value={pharmacyPin}
+              onChange={(e) => setPharmacyPin(e.target.value)}
+              placeholder="Enter 4-digit Pharmacy PIN"
+              maxLength={4}
+              className="w-full p-2 rounded bg-black border border-white/10"
+            />
+            <button
+              onClick={handleAddPharmacy}
+              disabled={loading}
+              className="w-full bg-indigo-600 py-2 rounded"
+            >
+              CONNECT PHARMACY
+            </button>
+            {addPharmacyError && (
+              <p className="text-red-400 text-sm">{addPharmacyError}</p>
+            )}
+            {addPharmacyInfo && (
+              <p className="text-green-400 text-sm">{addPharmacyInfo}</p>
+            )}
 
-        {/* ACTIVE ORDERS */}
-        <div className="bg-black/40 border border-green-500/30 rounded-xl p-6">
-          <h2 className="font-semibold mb-4 text-green-400">
-            My Active Orders
-          </h2>
-          <ul className="space-y-3">
-            {activeOrders.map((o) => (
-              <li
-                key={o.id}
-                className="border border-green-500/30 rounded p-4 space-y-2"
-              >
-                <p className="font-semibold">{o.pharmacyName}</p>
-                <p>Customer: {o.customerName}</p>
-
-                {o.status === "ASSIGNED" && (
-                  <button
-                    onClick={() => handleOnWayToPharmacy(o.id)}
-                    className="w-full bg-yellow-600 py-2 rounded"
-                  >
-                    ON THE WAY TO PHARMACY
-                  </button>
-                )}
-
-                {o.status === "ON_WAY_TO_PHARMACY" && (
-                  <button
-                    onClick={() => {
-                      setSelectedOrder(o);
-                      setShowPickupModal(true);
-                    }}
-                    className="w-full bg-indigo-600 py-2 rounded"
-                  >
-                    ARRIVED AT PHARMACY
-                  </button>
-                )}
-
-                {o.status === "ON_WAY_TO_CUSTOMER" && (
-                  <>
-                    <p className="text-xs text-green-400">
-                      🚚 On the way to deliver
-                    </p>
-                    {o.arrivedAtISO && (
-                      <p className="text-xs text-white/60">
-                        Arrival: {new Date(o.arrivedAtISO).toLocaleString("en-US")}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => handleArrivedAtCustomer(o)}
-                      className="w-full bg-green-600 py-2 rounded"
-                    >
-                      ARRIVED AT CUSTOMER
-                    </button>
-                  </>
-                )}
-
-                {o.customerPreviousPumps && o.customerPreviousPumps.length > 0 && (
-                  <p className="text-xs text-yellow-300">
-                    Reminder: customer already has pumps {o.customerPreviousPumps.join(", ")}. Please request them.
-                  </p>
-                )}
-
-                {o.returnReminderNote && (
-                  <p className="text-xs text-yellow-300">
-                    Reminder: {o.returnReminderNote}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+            {connectedPharmacies.length > 0 && (
+              <div className="mt-2">
+                <ul className="text-sm space-y-1">
+                  {connectedPharmacies.map((p) => (
+                    <li key={p.id} className="flex justify-between">
+                      <span>{p.pharmacyName || p.pharmacyId}</span>
+                      <span className="text-xs text-white/50">{p.city || ""}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* PICKUP MODAL */}
         {showPickupModal && selectedOrder && (
