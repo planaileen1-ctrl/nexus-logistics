@@ -60,7 +60,10 @@ export default function PumpReturnsPage() {
       : null;
 
   const [orders, setOrders] = useState<ReturnOrder[]>([]);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [loadingOrderId, setLoadingOrderId] = useState<string | null>(null);
+  const [selectedPumpsByOrder, setSelectedPumpsByOrder] = useState<
+    Record<string, Record<string, boolean>>
+  >({});
   const [info, setInfo] = useState("");
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "returned">("all");
@@ -105,6 +108,48 @@ export default function PumpReturnsPage() {
 
     return entry?.returnedToPharmacy === true;
   }
+
+  function getPendingReturnedPumps(order: ReturnOrder) {
+    return (order.previousPumpsStatus || [])
+      .filter((entry) => entry.returned)
+      .map((entry) => String(entry.pumpNumber))
+      .filter((pumpNumber) => !isPumpReturnedToPharmacy(order, pumpNumber));
+  }
+
+  function setAllPendingSelection(order: ReturnOrder, checked: boolean) {
+    const pendingPumps = getPendingReturnedPumps(order);
+
+    setSelectedPumpsByOrder((prev) => {
+      const nextOrderMap = { ...(prev[order.id] || {}) };
+      pendingPumps.forEach((pumpNumber) => {
+        nextOrderMap[pumpNumber] = checked;
+      });
+
+      return {
+        ...prev,
+        [order.id]: nextOrderMap,
+      };
+    });
+  }
+
+  useEffect(() => {
+    setSelectedPumpsByOrder((prev) => {
+      const next: Record<string, Record<string, boolean>> = {};
+
+      orders.forEach((order) => {
+        const pendingPumps = getPendingReturnedPumps(order);
+        const previousSelection = prev[order.id] || {};
+
+        next[order.id] = {};
+        pendingPumps.forEach((pumpNumber) => {
+          next[order.id][pumpNumber] =
+            previousSelection[pumpNumber] ?? true;
+        });
+      });
+
+      return next;
+    });
+  }, [orders]);
 
   const sortedOrders = [...orders].sort((a, b) => {
     const toMs = (ts: any) => {
@@ -161,64 +206,81 @@ export default function PumpReturnsPage() {
     }).length,
   };
 
-  async function handleConfirmReturn(order: ReturnOrder, pumpNumber: string) {
+  async function handleConfirmReturn(order: ReturnOrder) {
     if (!pharmacyId) return;
+
+    const selectedMap = selectedPumpsByOrder[order.id] || {};
+    const pumpsToConfirm = getPendingReturnedPumps(order).filter(
+      (pumpNumber) => selectedMap[pumpNumber]
+    );
+
+    if (pumpsToConfirm.length === 0) {
+      setError("Select at least one pump to mark as returned to pharmacy.");
+      return;
+    }
 
     setError("");
     setInfo("");
-    setLoadingId(`${order.id}-${pumpNumber}`);
+    setLoadingOrderId(order.id);
 
     try {
       const updated = [...(order.previousPumpsReturnToPharmacy || [])];
-      const idx = updated.findIndex(
-        (item) => String(item.pumpNumber) === String(pumpNumber)
-      );
 
-      if (idx >= 0) {
-        updated[idx] = {
-          pumpNumber: String(pumpNumber),
-          returnedToPharmacy: true,
-        };
-      } else {
-        updated.push({
-          pumpNumber: String(pumpNumber),
-          returnedToPharmacy: true,
-        });
-      }
+      pumpsToConfirm.forEach((pumpNumber) => {
+        const idx = updated.findIndex(
+          (item) => String(item.pumpNumber) === String(pumpNumber)
+        );
+
+        if (idx >= 0) {
+          updated[idx] = {
+            pumpNumber: String(pumpNumber),
+            returnedToPharmacy: true,
+          };
+        } else {
+          updated.push({
+            pumpNumber: String(pumpNumber),
+            returnedToPharmacy: true,
+          });
+        }
+      });
 
       await updateDoc(doc(db, "orders", order.id), {
         previousPumpsReturnToPharmacy: updated,
         statusUpdatedAt: serverTimestamp(),
       });
 
-      const pumpQuery = query(
-        collection(db, "pumps"),
-        where("pharmacyId", "==", pharmacyId),
-        where("pumpNumber", "==", String(pumpNumber))
+      await Promise.all(
+        pumpsToConfirm.map(async (pumpNumber) => {
+          const pumpQuery = query(
+            collection(db, "pumps"),
+            where("pharmacyId", "==", pharmacyId),
+            where("pumpNumber", "==", String(pumpNumber))
+          );
+
+          const pumpSnap = await getDocs(pumpQuery);
+          if (!pumpSnap.empty) {
+            const pumpDoc = pumpSnap.docs[0];
+            await updateDoc(doc(db, "pumps", pumpDoc.id), {
+              status: "IN_MAINTENANCE",
+              maintenanceDue: true,
+              maintenanceDueAt: serverTimestamp(),
+              maintenanceStatus: {
+                cleaned: false,
+                calibrated: false,
+                inspected: false,
+              },
+            });
+          }
+        })
       );
 
-      const pumpSnap = await getDocs(pumpQuery);
-      if (!pumpSnap.empty) {
-        const pumpDoc = pumpSnap.docs[0];
-        await updateDoc(doc(db, "pumps", pumpDoc.id), {
-          status: "IN_MAINTENANCE",
-          maintenanceDue: true,
-          maintenanceDueAt: serverTimestamp(),
-          maintenanceStatus: {
-            cleaned: false,
-            calibrated: false,
-            inspected: false,
-          },
-        });
-      }
-
-      setInfo("Return confirmed.");
+      setInfo(`Marked ${pumpsToConfirm.length} pump(s) as returned to pharmacy.`);
       setTimeout(() => setInfo(""), 4000);
     } catch (err) {
       console.error("handleConfirmReturn error:", err);
       setError("Failed to confirm return.");
     } finally {
-      setLoadingId(null);
+      setLoadingOrderId(null);
     }
   }
 
@@ -311,6 +373,25 @@ export default function PumpReturnsPage() {
                 <p className="text-xs text-white/60">Return status</p>
                 {o.previousPumpsStatus && o.previousPumpsStatus.length > 0 ? (
                   <div className="space-y-2">
+                    {getPendingReturnedPumps(o).length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAllPendingSelection(o, true)}
+                          className="text-[11px] px-2 py-1 rounded border border-white/20 hover:border-white/40"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAllPendingSelection(o, false)}
+                          className="text-[11px] px-2 py-1 rounded border border-white/20 hover:border-white/40"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+
                     {o.previousPumpsStatus.map((entry) => (
                       <div
                         key={entry.pumpNumber}
@@ -332,19 +413,43 @@ export default function PumpReturnsPage() {
                                 Returned to pharmacy
                               </p>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={loadingId === `${o.id}-${entry.pumpNumber}`}
-                                onClick={() => handleConfirmReturn(o, entry.pumpNumber)}
-                                className="text-xs px-3 py-1 bg-amber-600 rounded disabled:opacity-50"
-                              >
-                                Mark returned to pharmacy
-                              </button>
+                              <label className="flex items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    selectedPumpsByOrder[o.id]?.[String(entry.pumpNumber)] ?? true
+                                  }
+                                  onChange={(e) => {
+                                    const pumpNumber = String(entry.pumpNumber);
+                                    setSelectedPumpsByOrder((prev) => ({
+                                      ...prev,
+                                      [o.id]: {
+                                        ...(prev[o.id] || {}),
+                                        [pumpNumber]: e.target.checked,
+                                      },
+                                    }));
+                                  }}
+                                />
+                                Mark pump #{entry.pumpNumber} as returned to pharmacy
+                              </label>
                             )}
                           </div>
                         )}
                       </div>
                     ))}
+
+                    {getPendingReturnedPumps(o).length > 0 && (
+                      <button
+                        type="button"
+                        disabled={loadingOrderId === o.id}
+                        onClick={() => handleConfirmReturn(o)}
+                        className="text-xs px-3 py-2 bg-amber-600 rounded disabled:opacity-50"
+                      >
+                        {loadingOrderId === o.id
+                          ? "Saving..."
+                          : "Mark selected returned to pharmacy"}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs">

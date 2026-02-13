@@ -77,15 +77,20 @@ type Order = {
   driverLongitude?: number;
 };
 
-async function getDriverCurrentLocation(): Promise<{ lat: number; lng: number } | null> {
+async function getDriverCurrentLocation(
+  options?: { timeoutMs?: number; maximumAge?: number }
+): Promise<{ lat: number; lng: number } | null> {
   if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+
+  const timeoutMs = options?.timeoutMs ?? 8000;
+  const maximumAge = options?.maximumAge ?? 0;
 
   try {
     const position = await new Promise<GeolocationPosition>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 0,
+        timeout: timeoutMs,
+        maximumAge,
       });
     });
 
@@ -95,6 +100,25 @@ async function getDriverCurrentLocation(): Promise<{ lat: number; lng: number } 
     };
   } catch {
     return null;
+  }
+}
+
+async function getClientIpWithTimeout(timeoutMs = 1200): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    const res = await fetch("https://api.ipify.org?format=json", {
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) return "";
+    const data = await res.json();
+    return (data?.ip as string) || "";
+  } catch {
+    return "";
   }
 }
 
@@ -538,22 +562,16 @@ export default function DriverDashboardPage() {
     }
 
     setDeliveryLoading(true);
+    setShowDeliveryModal(false);
+    setDeliveryInfo("Saving delivery...");
     let completed = false;
 
     try {
-      const [location, ip] = await Promise.all([
-        getDriverCurrentLocation(),
-        (async () => {
-          try {
-            const res = await fetch("https://api.ipify.org?format=json");
-            const data = await res.json();
-            return data.ip as string;
-          } catch (err) {
-            console.warn("Failed to obtain client IP:", err);
-            return "";
-          }
-        })(),
-      ]);
+      const locationPromise = getDriverCurrentLocation({
+        timeoutMs: 1500,
+        maximumAge: 30000,
+      });
+      const ipPromise = getClientIpWithTimeout(1200);
 
       const deliveredAtISO = new Date().toISOString();
 
@@ -564,6 +582,8 @@ export default function DriverDashboardPage() {
           generateSHA256Hash(signature),
           generateSHA256Hash(driverSignature),
         ]);
+
+      const [location, ip] = await Promise.all([locationPromise, ipPromise]);
 
       const allReturned =
         previousPumpsStatusList.length > 0 &&
@@ -718,6 +738,8 @@ export default function DriverDashboardPage() {
       })();
     } catch (err) {
       console.error("handleCompleteDelivery error:", err);
+      setShowDeliveryModal(true);
+      setDeliveryInfo("");
       setDeliveryError("Failed to confirm delivery. Please try again.");
     } finally {
       setDeliveryLoading(false);
@@ -733,7 +755,6 @@ export default function DriverDashboardPage() {
       setDeliveryInfo(
         `Delivery registered successfully at ${new Date().toLocaleString("en-US")}.`
       );
-      alert("Delivery registered successfully.");
       setTimeout(() => setDeliveryInfo(""), 6000);
     }
   }
