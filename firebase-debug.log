@@ -1,0 +1,76 @@
+[debug] [2026-02-13T16:32:13.022Z] ----------------------------------------------------------------------
+[debug] [2026-02-13T16:32:13.025Z] Command:       C:\nvm4w\nodejs\node.exe C:\Users\User\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules --debug
+[debug] [2026-02-13T16:32:13.026Z] CLI Version:   14.26.0
+[debug] [2026-02-13T16:32:13.026Z] Platform:      win32
+[debug] [2026-02-13T16:32:13.026Z] Node Version:  v24.11.1
+[debug] [2026-02-13T16:32:13.026Z] Time:          Fri Feb 13 2026 11:32:13 GMT-0500 (hora de Ecuador)
+[debug] [2026-02-13T16:32:13.026Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-02-13T16:32:13.028Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-02-13T16:32:13.274Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-13T16:32:13.276Z] > authorizing via signed-in user (planaileen@gmail.com)
+[debug] [2026-02-13T16:32:13.276Z] [iam] checking project delivery-dispatcher-f11cc for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-02-13T16:32:13.277Z] Checked if tokens are valid: false, expires at: 1769927298715
+[debug] [2026-02-13T16:32:13.278Z] Checked if tokens are valid: false, expires at: 1769927298715
+[debug] [2026-02-13T16:32:13.278Z] > refreshing access token with scopes: []
+[debug] [2026-02-13T16:32:13.280Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-02-13T16:32:13.280Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-13T16:32:13.542Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2026-02-13T16:32:13.547Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-02-13T16:32:13.579Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-02-13T16:32:13.583Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-13T16:32:13.593Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/delivery-dispatcher-f11cc:testIamPermissions [none]
+[debug] [2026-02-13T16:32:13.601Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/delivery-dispatcher-f11cc:testIamPermissions x-goog-quota-user=projects/delivery-dispatcher-f11cc
+[debug] [2026-02-13T16:32:13.620Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/delivery-dispatcher-f11cc:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-02-13T16:32:14.266Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/delivery-dispatcher-f11cc:testIamPermissions 200
+[debug] [2026-02-13T16:32:14.267Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/delivery-dispatcher-f11cc:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'delivery-dispatcher-f11cc'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-02-13T16:32:14.279Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:14.280Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:14.281Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/delivery-dispatcher-f11cc/services/firestore.googleapis.com [none]
+[debug] [2026-02-13T16:32:14.281Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/delivery-dispatcher-f11cc/services/firestore.googleapis.com x-goog-quota-user=projects/delivery-dispatcher-f11cc
+[debug] [2026-02-13T16:32:15.130Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/delivery-dispatcher-f11cc/services/firestore.googleapis.com 200
+[debug] [2026-02-13T16:32:15.131Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/delivery-dispatcher-f11cc/services/firestore.googleapis.com [omitted]
+[info] +  firestore: required API firestore.googleapis.com is enabled 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-02-13T16:32:15.144Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:15.145Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:15.146Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/delivery-dispatcher-f11cc/databases/(default) [none]
+[debug] [2026-02-13T16:32:15.925Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/delivery-dispatcher-f11cc/databases/(default) 200
+[debug] [2026-02-13T16:32:15.926Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/delivery-dispatcher-f11cc/databases/(default) {"name":"projects/delivery-dispatcher-f11cc/databases/(default)","uid":"c20a5de8-26d8-4dee-84d8-61a2513aafba","createTime":"2026-01-28T16:44:14.121490Z","updateTime":"2026-01-28T16:44:14.121490Z","locationId":"us-central1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-02-13T15:32:17.181257Z","appEngineIntegrationMode":"DISABLED","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IN7E+q/y1pIDMKX75rrTy5ID"}
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-02-13T16:32:15.929Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:15.929Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:15.930Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc:test [none]
+[debug] [2026-02-13T16:32:15.930Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc:test [omitted]
+[debug] [2026-02-13T16:32:16.396Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc:test 200
+[debug] [2026-02-13T16:32:16.396Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-02-13T16:32:16.399Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.399Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.399Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases pageSize=10&pageToken=
+[debug] [2026-02-13T16:32:16.626Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases 200
+[debug] [2026-02-13T16:32:16.626Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases {"releases":[{"name":"projects/delivery-dispatcher-f11cc/releases/cloud.firestore","rulesetName":"projects/delivery-dispatcher-f11cc/rulesets/a3b4a8c3-4211-423e-b93a-16cc5df49bec","createTime":"2026-01-28T16:44:17.052363Z","updateTime":"2026-02-13T13:58:19.801832Z"},{"name":"projects/delivery-dispatcher-f11cc/releases/firebase.storage/delivery-dispatcher-f11cc.firebasestorage.app","rulesetName":"projects/delivery-dispatcher-f11cc/rulesets/acad172d-1ed5-402a-9406-c1e14dc6d7f6","createTime":"2026-02-11T23:38:17.520807Z","updateTime":"2026-02-11T23:38:17.520807Z"}]}
+[debug] [2026-02-13T16:32:16.640Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.643Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.644Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets/a3b4a8c3-4211-423e-b93a-16cc5df49bec [none]
+[debug] [2026-02-13T16:32:16.863Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets/a3b4a8c3-4211-423e-b93a-16cc5df49bec 200
+[debug] [2026-02-13T16:32:16.865Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets/a3b4a8c3-4211-423e-b93a-16cc5df49bec [omitted]
+[info] i  firestore: uploading rules firestore.rules... 
+[debug] [2026-02-13T16:32:16.868Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.869Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:16.871Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets [none]
+[debug] [2026-02-13T16:32:16.873Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets [omitted]
+[debug] [2026-02-13T16:32:17.156Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets 200
+[debug] [2026-02-13T16:32:17.158Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/rulesets {"name":"projects/delivery-dispatcher-f11cc/rulesets/6b0cca35-17b3-416b-8736-a6380b90c7bf","source":{"files":[{"content":"rules_version = '2';\r\nservice cloud.firestore {\r\n  match /databases/{database}/documents {\r\n    match /{document=**} {\r\n      allow read, write: if request.auth != null;\r\n    }\r\n  }\r\n}\r\n","name":"firestore.rules"}]},"createTime":"2026-02-13T16:32:18.399631Z","metadata":{"services":["cloud.firestore"]}}
+[debug] [2026-02-13T16:32:17.163Z] [rules] created ruleset projects/delivery-dispatcher-f11cc/rulesets/6b0cca35-17b3-416b-8736-a6380b90c7bf
+[debug] [2026-02-13T16:32:17.168Z] [rules] releasing cloud.firestore/(default) with ruleset projects/delivery-dispatcher-f11cc/rulesets/6b0cca35-17b3-416b-8736-a6380b90c7bf
+[debug] [2026-02-13T16:32:17.170Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:17.172Z] Checked if tokens are valid: true, expires at: 1771003932583
+[debug] [2026-02-13T16:32:17.174Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases/cloud.firestore/(default) [none]
+[debug] [2026-02-13T16:32:17.175Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases/cloud.firestore/(default) {"release":{"name":"projects/delivery-dispatcher-f11cc/releases/cloud.firestore/(default)","rulesetName":"projects/delivery-dispatcher-f11cc/rulesets/6b0cca35-17b3-416b-8736-a6380b90c7bf"}}
+[debug] [2026-02-13T16:32:17.542Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/delivery-dispatcher-f11cc/releases/cloud.firestore/(default) 200
