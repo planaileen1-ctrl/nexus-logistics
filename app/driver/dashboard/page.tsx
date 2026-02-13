@@ -167,8 +167,12 @@ export default function DriverDashboardPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [employeeSignature, setEmployeeSignature] = useState("");
   const [driverPickupSignature, setDriverPickupSignature] = useState("");
+  const [receiverName, setReceiverName] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryError, setDeliveryError] = useState("");
+  const [deliveryInfo, setDeliveryInfo] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -351,113 +355,126 @@ export default function DriverDashboardPage() {
   async function handleCompleteDelivery() {
     if (!selectedOrder) return;
 
+    setDeliveryError("");
+    setDeliveryInfo("");
+
+    if (!receiverName.trim()) {
+      setDeliveryError("Employee name is required.");
+      return;
+    }
+
     if (!signature || !driverSignature) {
-      alert("Both customer and driver signatures are required before delivery.");
+      setDeliveryError("Both customer and driver signatures are required.");
       return;
     }
 
-    // Obtener geolocalización (cliente)
-    let location: { lat: number; lng: number };
+    setDeliveryLoading(true);
+    let completed = false;
+
     try {
-      location = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) =>
-            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-          () => reject(new Error("Location required"))
+      // Obtener geolocalización (cliente)
+      const location: { lat: number; lng: number } = await new Promise(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) =>
+              resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => reject(new Error("Location required"))
+          );
+        }
+      );
+
+      // Obtener IP cliente
+      let ip = "";
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        ip = data.ip;
+      } catch (err) {
+        console.warn("Failed to obtain client IP:", err);
+      }
+
+      const deliveredAtISO = new Date().toISOString();
+
+      // 1️⃣ Subir imagenes a Storage (customer + driver)
+      const signatureUrl = await uploadSignatureToStorage(
+        `${selectedOrder.id}-customer`,
+        signature
+      );
+
+      const driverSignatureUrl = await uploadSignatureToStorage(
+        `${selectedOrder.id}-driver`,
+        driverSignature
+      );
+
+      // 2️⃣ Generar hashes
+      const signatureHash = await generateSHA256Hash(signature);
+      const driverSignatureHash = await generateSHA256Hash(driverSignature);
+
+      // 3️⃣ Generar PDF legal
+      let legalPdfUrl = "";
+      try {
+        const pdfBlob = await generateDeliveryPDF({
+          orderId: selectedOrder.id,
+          customerName: selectedOrder.customerName,
+          driverName: driverName || "",
+          pumpNumbers: selectedOrder.pumpNumbers,
+          deliveredAt: deliveredAtISO,
+          ip,
+          lat: location.lat,
+          lng: location.lng,
+          signatureUrl,
+          driverSignatureUrl,
+        });
+
+        const pdfRef = storageRef(
+          storage,
+          `delivery_pdfs/${selectedOrder.id}.pdf`
         );
-      });
-    } catch (err) {
-      alert("Location access is required for delivery.");
-      return;
-    }
+        await uploadBytes(pdfRef, pdfBlob);
+        legalPdfUrl = await getDownloadURL(pdfRef);
+      } catch (err) {
+        console.error("Failed to generate or upload PDF:", err);
+      }
 
-    // Obtener IP cliente
-    let ip = "";
-    try {
-      const res = await fetch("https://api.ipify.org?format=json");
-      const data = await res.json();
-      ip = data.ip;
-    } catch (err) {
-      console.warn("Failed to obtain client IP:", err);
-    }
-
-    const deliveredAtISO = new Date().toISOString();
-
-    // 1️⃣ Subir imagenes a Storage (customer + driver)
-    const signatureUrl = await uploadSignatureToStorage(
-      `${selectedOrder.id}-customer`,
-      signature
-    );
-
-    const driverSignatureUrl = await uploadSignatureToStorage(
-      `${selectedOrder.id}-driver`,
-      driverSignature
-    );
-
-    // 2️⃣ Generar hashes
-    const signatureHash = await generateSHA256Hash(signature);
-    const driverSignatureHash = await generateSHA256Hash(driverSignature);
-
-    // 3️⃣ Generar PDF legal
-    let legalPdfUrl = "";
-    try {
-      const pdfBlob = await generateDeliveryPDF({
+      // 4️⃣ Guardar en collection de firmas (solo URL + hash + meta)
+      await addDoc(collection(db, "deliverySignatures"), {
         orderId: selectedOrder.id,
-        customerName: selectedOrder.customerName,
-        driverName: driverName || "",
+        pharmacyId: selectedOrder.pharmacyId,
+        pharmacyName: selectedOrder.pharmacyName,
         pumpNumbers: selectedOrder.pumpNumbers,
-        deliveredAt: deliveredAtISO,
-        ip,
-        lat: location.lat,
-        lng: location.lng,
+        customerName: selectedOrder.customerName,
+        customerAddress: selectedOrder.customerAddress,
+        receivedByName: receiverName.trim(),
+        driverId,
+        driverName,
         signatureUrl,
+        signatureHash,
         driverSignatureUrl,
+        driverSignatureHash,
+        deliveredAt: serverTimestamp(),
+        deliveredAtISO,
+        deliveredFromIP: ip,
+        deliveredLatitude: location.lat,
+        deliveredLongitude: location.lng,
+        legalPdfUrl,
       });
 
-      const pdfRef = storageRef(storage, `delivery_pdfs/${selectedOrder.id}.pdf`);
-      await uploadBytes(pdfRef, pdfBlob);
-      legalPdfUrl = await getDownloadURL(pdfRef);
-    } catch (err) {
-      console.error("Failed to generate or upload PDF:", err);
-    }
-
-    // 4️⃣ Guardar en collection de firmas (solo URL + hash + meta)
-    await addDoc(collection(db, "deliverySignatures"), {
-      orderId: selectedOrder.id,
-      pharmacyId: selectedOrder.pharmacyId,
-      pharmacyName: selectedOrder.pharmacyName,
-      pumpNumbers: selectedOrder.pumpNumbers,
-      customerName: selectedOrder.customerName,
-      customerAddress: selectedOrder.customerAddress,
-      driverId,
-      driverName,
-      signatureUrl,
-      signatureHash,
-      driverSignatureUrl,
-      driverSignatureHash,
-      deliveredAt: serverTimestamp(),
-      deliveredAtISO,
-      deliveredFromIP: ip,
-      deliveredLatitude: location.lat,
-      deliveredLongitude: location.lng,
-      legalPdfUrl,
-    });
-
-    // 5️⃣ Guardar solo URL + hash + meta en la orden (NO base64)
-    await updateDoc(doc(db, "orders", selectedOrder.id), {
-      signatureUrl,
-      signatureHash,
-      driverSignatureUrl,
-      driverSignatureHash,
-      deliveredAt: serverTimestamp(),
-      deliveredAtISO,
-      deliveredFromIP: ip,
-      deliveredLatitude: location.lat,
-      deliveredLongitude: location.lng,
-      legalPdfUrl,
-      status: "DELIVERED",
-      statusUpdatedAt: serverTimestamp(),
-    });
+      // 5️⃣ Guardar solo URL + hash + meta en la orden (NO base64)
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        signatureUrl,
+        signatureHash,
+        driverSignatureUrl,
+        driverSignatureHash,
+        deliveredAt: serverTimestamp(),
+        deliveredAtISO,
+        deliveredFromIP: ip,
+        deliveredLatitude: location.lat,
+        deliveredLongitude: location.lng,
+        legalPdfUrl,
+        receivedByName: receiverName.trim(),
+        status: "DELIVERED",
+        statusUpdatedAt: serverTimestamp(),
+      });
 
     // Actualizar estado de bombas y registrar movimiento (DELIVERED)
     for (const pumpNumber of selectedOrder!.pumpNumbers) {
@@ -489,17 +506,36 @@ export default function DriverDashboardPage() {
       }
     }
 
-    setShowDeliveryModal(false);
-    setSelectedOrder(null);
-    setSignature(null);
-    setDriverSignature("");
-    loadOrders();
+      completed = true;
+      loadOrders();
+    } catch (err) {
+      console.error("handleCompleteDelivery error:", err);
+      setDeliveryError("Failed to confirm delivery. Please try again.");
+    } finally {
+      setDeliveryLoading(false);
+    }
+
+    if (completed) {
+      setShowDeliveryModal(false);
+      setSelectedOrder(null);
+      setSignature(null);
+      setDriverSignature("");
+      setReceiverName("");
+      setDeliveryInfo("Delivery saved successfully.");
+      setTimeout(() => setDeliveryInfo(""), 6000);
+    }
   }
 
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10">
       <div className="w-full max-w-xl space-y-8">
         <h1 className="text-2xl font-bold text-center">Driver Dashboard</h1>
+
+        {deliveryInfo && (
+          <p className="text-green-400 text-sm text-center">
+            {deliveryInfo}
+          </p>
+        )}
 
         {/* CONNECT PHARMACY */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
@@ -700,42 +736,39 @@ export default function DriverDashboardPage() {
                 Cliente: {selectedOrder.customerName}
               </p>
 
+              <div className="space-y-1">
+                <label className="text-xs text-white/70">Empleado</label>
+                <input
+                  value={receiverName}
+                  onChange={(e) => setReceiverName(e.target.value)}
+                  placeholder="Nombre del empleado que recibe"
+                  className="w-full p-2 rounded bg-black border border-white/10"
+                />
+              </div>
+
               <DeliverySignature
                 title="Customer Signature"
+                mode="auto"
                 onSave={(dataUrl) => {
                   setSignature(dataUrl);
                 }}
               />
-              {signature && (
-                <div className="pt-2">
-                  <p className="text-xs text-white/60">Preview:</p>
-                  <img
-                    src={signature}
-                    alt="Signature preview"
-                    className="w-full h-24 object-contain border border-white/10 rounded mt-1"
-                  />
-                  <div className="flex justify-end mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setSignature(null)}
-                      className="text-xs px-3 py-1 bg-gray-700 rounded"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
               <DeliverySignature
                 title="Driver Signature"
+                mode="auto"
                 onSave={(dataUrl) => setDriverSignature(dataUrl)}
               />
 
+              {deliveryError && (
+                <p className="text-red-400 text-sm">{deliveryError}</p>
+              )}
+
               <button
                 onClick={handleCompleteDelivery}
-                disabled={!signature || !driverSignature}
+                disabled={deliveryLoading || !signature || !driverSignature}
                 className="w-full bg-green-600 py-2 rounded disabled:opacity-50"
               >
-                CONFIRM DELIVERY
+                {deliveryLoading ? "SAVING..." : "CONFIRM DELIVERY"}
               </button>
             </div>
           </div>

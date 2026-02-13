@@ -5,9 +5,14 @@ import { useRef, useState } from "react";
 type Props = {
   title: string;
   onSave: (dataUrl: string) => void;
+  mode?: "manual" | "auto";
 };
 
-export default function DeliverySignature({ title, onSave }: Props) {
+export default function DeliverySignature({
+  title,
+  onSave,
+  mode = "manual",
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -37,6 +42,10 @@ export default function DeliverySignature({ title, onSave }: Props) {
   function end() {
     setDrawing(false);
     canvasRef.current?.getContext("2d")?.beginPath();
+
+    if (mode === "auto") {
+      autoSave();
+    }
   }
 
   function draw(e: any) {
@@ -63,6 +72,7 @@ export default function DeliverySignature({ title, onSave }: Props) {
     ctx?.clearRect(0, 0, 400, 200);
     ctx?.beginPath();
     setHasDrawn(false);
+    onSave("");
   }
 
   function save() {
@@ -80,6 +90,15 @@ export default function DeliverySignature({ title, onSave }: Props) {
       alert("Signature is too small or invalid.");
       return;
     }
+
+    onSave(dataUrl);
+  }
+
+  function autoSave() {
+    if (!canvasRef.current || !hasDrawn) return;
+
+    const dataUrl = canvasRef.current.toDataURL("image/png");
+    if (dataUrl.length < 2000) return;
 
     onSave(dataUrl);
   }
@@ -110,12 +129,14 @@ export default function DeliverySignature({ title, onSave }: Props) {
           Clear
         </button>
 
-        <button
-          onClick={save}
-          className="text-xs px-3 py-1 bg-green-600 rounded"
-        >
-          Save Signature
-        </button>
+        {mode === "manual" && (
+          <button
+            onClick={save}
+            className="text-xs px-3 py-1 bg-green-600 rounded"
+          >
+            Save Signature
+          </button>
+        )}
       </div>
     </div>
   );
