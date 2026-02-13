@@ -72,12 +72,14 @@ export default function PumpMaintenancePage() {
     };
   }, []);
 
-  async function handleSave(pumpId: string, status: Pump["maintenanceStatus"]) {
+  async function handleSave(pumpId: string) {
     setError("");
     setInfo("");
     setLoadingId(pumpId);
 
     try {
+      const currentPump = pumps.find((pump) => pump.id === pumpId);
+      const status = currentPump?.maintenanceStatus;
       const cleaned = status?.cleaned === true;
       const calibrated = status?.calibrated === true;
       const inspected = status?.inspected === true;
@@ -145,7 +147,7 @@ export default function PumpMaintenancePage() {
                               ? {
                                   ...p,
                                   maintenanceStatus: {
-                                    ...status,
+                                    ...(p.maintenanceStatus || {}),
                                     cleaned: e.target.checked,
                                   },
                                 }
@@ -167,7 +169,7 @@ export default function PumpMaintenancePage() {
                               ? {
                                   ...p,
                                   maintenanceStatus: {
-                                    ...status,
+                                    ...(p.maintenanceStatus || {}),
                                     calibrated: e.target.checked,
                                   },
                                 }
@@ -189,7 +191,7 @@ export default function PumpMaintenancePage() {
                               ? {
                                   ...p,
                                   maintenanceStatus: {
-                                    ...status,
+                                    ...(p.maintenanceStatus || {}),
                                     inspected: e.target.checked,
                                   },
                                 }
@@ -205,7 +207,7 @@ export default function PumpMaintenancePage() {
                 <button
                   type="button"
                   disabled={loadingId === pump.id}
-                  onClick={() => handleSave(pump.id, pump.maintenanceStatus)}
+                  onClick={() => handleSave(pump.id)}
                   className="text-xs px-3 py-2 bg-emerald-600 rounded disabled:opacity-50"
                 >
                   {loadingId === pump.id ? "Saving..." : "Save Maintenance"}

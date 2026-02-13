@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "cleanup:drivers:dry": "node scripts/remove-driver-vehicle-fields.js --dryRun",
-    "cleanup:drivers": "node scripts/remove-driver-vehicle-fields.js"
+    "cleanup:drivers": "node scripts/remove-driver-vehicle-fields.js",
+    "cleanup:pumps:maintenance:dry": "node scripts/fix-pumps-maintenance-state.js --dryRun",
+    "cleanup:pumps:maintenance": "node scripts/fix-pumps-maintenance-state.js"
   },
   "dependencies": {
     "firebase": "^12.9.0",
