@@ -55,6 +55,9 @@ export default function RegisterDriverPage() {
   const [vehiclePhotoBase64, setVehiclePhotoBase64] = useState<string | null>(null);
   const [driverPin, setDriverPin] = useState<string | null>(null);
   const [driverId, setDriverId] = useState<string | null>(null);
+  const [signatureSaved, setSignatureSaved] = useState(false);
+  const [savingSignature, setSavingSignature] = useState(false);
+  const [signatureError, setSignatureError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,21 +142,55 @@ export default function RegisterDriverPage() {
           </div>
 
           <SignaturePad
-            onSave={(signatureBase64) => {
-              addDoc(collection(db, "signatures"), {
-                driverId,
-                signatureBase64,
-                createdAt: serverTimestamp(),
-              });
+            onSave={async (signatureBase64) => {
+              setSavingSignature(true);
+              setSignatureError(null);
+
+              try {
+                await ensureAnonymousAuth();
+
+                await addDoc(collection(db, "signatures"), {
+                  driverId,
+                  signatureBase64,
+                  createdAt: serverTimestamp(),
+                });
+
+                setSignatureSaved(true);
+              } catch (err) {
+                console.error(err);
+                const message = err instanceof Error ? err.message : "Unknown error";
+                setSignatureError(`Failed to save signature. ${message}`);
+              } finally {
+                setSavingSignature(false);
+              }
             }}
           />
 
+          {savingSignature && (
+            <p className="text-xs text-slate-300 mt-3">Saving signature...</p>
+          )}
+
+          {signatureSaved && (
+            <p className="text-xs text-green-400 mt-3">Signature saved successfully.</p>
+          )}
+
+          {signatureError && (
+            <p className="text-xs text-red-400 mt-3">{signatureError}</p>
+          )}
+
           <button
+            disabled={!signatureSaved || savingSignature}
             onClick={() => router.push("/auth/login")}
-            className="w-full mt-6 py-2 rounded bg-green-600 hover:bg-green-700"
+            className="w-full mt-6 py-2 rounded bg-green-600 hover:bg-green-700 disabled:opacity-50"
           >
             Finish & Go to Login
           </button>
+
+          {!signatureSaved && !savingSignature && (
+            <p className="text-xs text-slate-400 mt-3">
+              Save signature first to continue.
+            </p>
+          )}
         </div>
       </main>
     );

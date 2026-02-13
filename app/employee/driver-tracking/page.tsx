@@ -46,7 +46,7 @@ export default function DriverTrackingPage() {
     })();
 
     return () => {
-      // Limpiar listeners cuando se desmonta el componente
+      // Clean up listeners when component unmounts
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
       }
@@ -61,7 +61,7 @@ export default function DriverTrackingPage() {
       setLoading(true);
       setIsLive(true);
 
-      // Configurar listener en tiempo real de Firestore
+      // Set up Firestore realtime listener
       const q = query(
         collection(db, "orders"),
         where("pharmacyId", "==", pharmacyId),
@@ -98,19 +98,19 @@ export default function DriverTrackingPage() {
           setLoading(false);
         },
         (err) => {
-          console.error("Error en listener de Firestore:", err);
+          console.error("Firestore listener error:", err);
           setIsLive(false);
           setLoading(false);
         }
       );
 
-      // Intervalo de polling adicional cada 8 segundos para refrescar UI
+      // Extra polling interval every 8 seconds to refresh UI
       updateIntervalRef.current = setInterval(() => {
-        // Trigger a re-render para actualizar timestamps y UI
+        // Trigger a re-render to update timestamps and UI
         setDrivers((prev) => [...prev]);
       }, 8000);
     } catch (err) {
-      console.error("Error al configurar tracking:", err);
+      console.error("Tracking setup error:", err);
       setIsLive(false);
       setLoading(false);
     }
