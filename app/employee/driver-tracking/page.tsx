@@ -173,6 +173,12 @@ export default function DriverTrackingPage() {
     }
   };
 
+  const driversWithoutLocation = drivers.filter(
+    (driver) => driver.lat === undefined || driver.lng === undefined
+  );
+
+  const showLocationPermissionWarning = !loading && drivers.length > 0 && driversWithoutLocation.length > 0;
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -197,6 +203,17 @@ export default function DriverTrackingPage() {
 
         {/* MAP */}
         <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 p-6">
+          {showLocationPermissionWarning && (
+            <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3">
+              <p className="text-xs text-amber-300 font-semibold">
+                Location permission required for one or more drivers.
+              </p>
+              <p className="text-xs text-amber-200/80 mt-1">
+                Ask drivers to enable GPS/location in their browser and update their order status.
+              </p>
+            </div>
+          )}
+
           {loading ? (
             <div className="h-96 flex items-center justify-center">
               <div className="text-center space-y-3">
