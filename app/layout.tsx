@@ -14,6 +14,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import GlobalUppercaseEnforcer from "@/components/GlobalUppercaseEnforcer";
 
 /**
  * NOTE:
@@ -47,6 +48,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <GlobalUppercaseEnforcer />
         {children}
       </body>
     </html>

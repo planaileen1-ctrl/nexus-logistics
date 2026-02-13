@@ -30,4 +30,22 @@ body {
   font-family: var(--font-geist-sans);
   margin: 0;
   padding: 0;
+  text-transform: uppercase;
+}
+
+input,
+textarea,
+select,
+button {
+  text-transform: uppercase;
+}
+
+input[type="email"],
+input[type="email"]::placeholder {
+  text-transform: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  text-transform: uppercase;
 }
