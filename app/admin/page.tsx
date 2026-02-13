@@ -15,6 +15,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { collection, getDocs, query } from "firebase/firestore";
+import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import {
   createLicense,
   suspendLicense,
@@ -45,6 +47,27 @@ export default function AdminPage() {
     }
   }, [router]);
 
+  // 📋 Load existing licenses on mount
+  useEffect(() => {
+    loadLicenses();
+  }, []);
+
+  async function loadLicenses() {
+    try {
+      await ensureAnonymousAuth();
+      const licensesSnap = await getDocs(query(collection(db, "licenses")));
+      const loadedLicenses: License[] = licensesSnap.docs.map((doc) => ({
+        id: doc.id,
+        code: doc.data().code,
+        email: doc.data().email,
+        status: doc.data().status,
+      }));
+      setLicenses(loadedLicenses);
+    } catch (err) {
+      console.error("Error loading licenses:", err);
+    }
+  }
+
   async function handleCreateLicense() {
     if (!email) return;
 
@@ -66,41 +89,26 @@ export default function AdminPage() {
       text: `Your Nexus license code: ${result.code}. Created: ${sentAt}.`,
     });
 
-    setLicenses((prev) => [
-      {
-        id: result.id,
-        code: result.code,
-        email,
-        status: "ACTIVE",
-      },
-      ...prev,
-    ]);
-
     setEmail("");
+    
+    // Reload licenses from Firestore
+    await loadLicenses();
     setLoading(false);
   }
 
   async function handleSuspend(id: string) {
     await suspendLicense(id);
-    setLicenses((prev) =>
-      prev.map((l) =>
-        l.id === id ? { ...l, status: "SUSPENDED" } : l
-      )
-    );
+    await loadLicenses();
   }
 
   async function handleCancel(id: string) {
     await cancelLicense(id);
-    setLicenses((prev) =>
-      prev.map((l) =>
-        l.id === id ? { ...l, status: "CANCELLED" } : l
-      )
-    );
+    await loadLicenses();
   }
 
   async function handleDelete(id: string) {
     await deleteLicense(id);
-    setLicenses((prev) => prev.filter((l) => l.id !== id));
+    await loadLicenses();
   }
 
   return (
