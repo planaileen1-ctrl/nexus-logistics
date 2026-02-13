@@ -253,22 +253,29 @@ export default function EmployeeOrdersPage() {
 
       const orderRef = await addDoc(collection(db, "orders"), orderPayload);
 
-      // ✅ ACTUALIZAR ESTADO DE CADA PUMP
-      for (let i = 0; i < pumpIds.length; i++) {
-        await updateDoc(doc(db, "pumps", pumpIds[i]), {
-          status: "ASSIGNED",
-        });
+      // ✅ ACTUALIZAR ESTADO DE CADA PUMP (no bloquear si falta permiso)
+      const pumpUpdateFailures: string[] = [];
 
-        await logPumpMovement({
-          pumpId: pumpIds[i],
-          pumpNumber: pumpNumbers[i],
-          pharmacyId: pharmacyId!,
-          orderId: orderRef.id,
-          action: "ASSIGNED",
-          performedById: employeeId!,
-          performedByName: employeeName!,
-          role: "EMPLOYEE",
-        });
+      for (let i = 0; i < pumpIds.length; i++) {
+        try {
+          await updateDoc(doc(db, "pumps", pumpIds[i]), {
+            status: "ASSIGNED",
+          });
+
+          await logPumpMovement({
+            pumpId: pumpIds[i],
+            pumpNumber: pumpNumbers[i],
+            pharmacyId: pharmacyId!,
+            orderId: orderRef.id,
+            action: "ASSIGNED",
+            performedById: employeeId!,
+            performedByName: employeeName!,
+            role: "EMPLOYEE",
+          });
+        } catch (err) {
+          console.warn("Pump update/log failed:", pumpIds[i], err);
+          pumpUpdateFailures.push(pumpNumbers[i]);
+        }
       }
 
       setPumpIds([]);
@@ -276,7 +283,13 @@ export default function EmployeeOrdersPage() {
       setPumpSearch("");
       setCustomerId("");
 
-      setInfo("Order created and set to PENDING — drivers will receive it.");
+      if (pumpUpdateFailures.length > 0) {
+        setInfo(
+          `Order created, but some pump updates failed due to permissions. Pumps: ${pumpUpdateFailures.join(", ")}.`
+        );
+      } else {
+        setInfo("Order created and set to PENDING — drivers will receive it.");
+      }
       setTimeout(() => setInfo(""), 6000);
 
     } catch (err: any) {
