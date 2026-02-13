@@ -12,7 +12,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   collection,
   addDoc,
@@ -71,7 +71,6 @@ function formatDate(ts: any) {
 
 export default function EmployeeOrdersPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   /* ---------- Context ---------- */
   const pharmacyId =
@@ -136,13 +135,15 @@ export default function EmployeeOrdersPage() {
   }, []);
 
   useEffect(() => {
-    const view = searchParams.get("view");
+    if (typeof window === "undefined") return;
+
+    const view = new URLSearchParams(window.location.search).get("view");
     if (view === "activity") {
       setShowDriverActivity(true);
     } else if (view === "orders") {
       setShowDriverActivity(false);
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     if (!customerId) {
