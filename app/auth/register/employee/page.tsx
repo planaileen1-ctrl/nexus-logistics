@@ -25,7 +25,8 @@ export default function EmployeeRegisterPage() {
 
   // FORM FIELDS
   const [signatureSaved, setSignatureSaved] = useState(false);
-const [savingSignature, setSavingSignature] = useState(false);
+  const [savingSignature, setSavingSignature] = useState(false);
+  const [signatureError, setSignatureError] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [jobTitle, setJobTitle] = useState(""); // ✅ CARGO
@@ -133,20 +134,50 @@ const [savingSignature, setSavingSignature] = useState(false);
 
           <SignaturePad
             onSave={async (signatureBase64) => {
-              await saveEmployeeSignature({
-                employeeId,
-                employeeName: fullName,
-                pharmacyId: pharmacy.id,
-                signatureBase64,
-              });
+              setSavingSignature(true);
+              setSignatureError(null);
 
-              router.push("/auth/login");
+              try {
+                await saveEmployeeSignature({
+                  employeeId,
+                  employeeName: fullName,
+                  pharmacyId: pharmacy.id,
+                  signatureBase64,
+                });
+
+                setSignatureSaved(true);
+              } catch (err) {
+                console.error(err);
+                setSignatureError("Failed to save signature. Please try again.");
+              } finally {
+                setSavingSignature(false);
+              }
             }}
           />
+
+          {savingSignature && (
+            <p className="text-xs text-slate-300 mt-3">Saving signature...</p>
+          )}
+
+          {signatureSaved && (
+            <p className="text-xs text-green-400 mt-3">Signature saved successfully.</p>
+          )}
+
+          {signatureError && (
+            <p className="text-xs text-red-400 mt-3">{signatureError}</p>
+          )}
 
           <p className="text-xs text-slate-400 mt-3">
             Please sign using your finger or mouse
           </p>
+
+          <button
+            type="button"
+            onClick={() => router.push("/auth/login")}
+            className="w-full mt-5 py-2 rounded bg-green-600 hover:bg-green-700"
+          >
+            Go to Login
+          </button>
         </div>
       </main>
     );
