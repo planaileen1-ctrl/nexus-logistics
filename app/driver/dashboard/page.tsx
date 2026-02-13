@@ -50,6 +50,7 @@ type Order = {
   customerAddress?: string;
   customerState?: string;
   customerCountry?: string;
+  customerPreviousPumps?: string[];
   status: string;
   driverId?: string;
   driverName?: string;
@@ -173,6 +174,7 @@ export default function DriverDashboardPage() {
   const [deliveryLoading, setDeliveryLoading] = useState(false);
   const [deliveryError, setDeliveryError] = useState("");
   const [deliveryInfo, setDeliveryInfo] = useState("");
+  const [acceptInfo, setAcceptInfo] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -313,6 +315,13 @@ export default function DriverDashboardPage() {
       activeOrders.find((o) => o.id === id);
 
     if (order) {
+      if (order.customerPreviousPumps && order.customerPreviousPumps.length > 0) {
+        setAcceptInfo(
+          `Reminder: this customer already has pumps ${order.customerPreviousPumps.join(", ")}. Please request them.`
+        );
+        setTimeout(() => setAcceptInfo(""), 7000);
+      }
+
       for (const pumpNumber of order.pumpNumbers) {
         const q = query(
           collection(db, "pumps"),
@@ -537,6 +546,12 @@ export default function DriverDashboardPage() {
           </p>
         )}
 
+        {acceptInfo && (
+          <p className="text-yellow-300 text-sm text-center">
+            {acceptInfo}
+          </p>
+        )}
+
         {/* CONNECT PHARMACY */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
           <input
@@ -625,6 +640,12 @@ export default function DriverDashboardPage() {
                       ARRIVED AT CUSTOMER
                     </button>
                   </>
+                )}
+
+                {o.customerPreviousPumps && o.customerPreviousPumps.length > 0 && (
+                  <p className="text-xs text-yellow-300">
+                    Reminder: customer already has pumps {o.customerPreviousPumps.join(", ")}. Please request them.
+                  </p>
                 )}
               </li>
             ))}

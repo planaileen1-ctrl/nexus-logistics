@@ -48,6 +48,7 @@ type Order = {
   customerAddress?: string;
   customerState?: string;
   customerCountry?: string;
+  customerPreviousPumps?: string[];
   createdByEmployeeName: string;
   status: string;
   createdAt: any;
@@ -100,6 +101,9 @@ export default function EmployeeOrdersPage() {
   const [pumpSearch, setPumpSearch] = useState("");
 
   const [customerId, setCustomerId] = useState("");
+  const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
+  const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
+  const [showDriverActivity, setShowDriverActivity] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -126,6 +130,15 @@ export default function EmployeeOrdersPage() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!customerId) {
+      setCustomerPreviousPumps([]);
+      return;
+    }
+
+    loadCustomerPreviousPumps(customerId);
+  }, [customerId]);
 
   /* ---------- Loaders ---------- */
   async function loadPumps() {
@@ -170,6 +183,37 @@ export default function EmployeeOrdersPage() {
         country: d.data().country,
       }))
     );
+  }
+
+  async function loadCustomerPreviousPumps(targetCustomerId: string) {
+    if (!pharmacyId) return;
+
+    setCustomerPumpsLoading(true);
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("pharmacyId", "==", pharmacyId),
+        where("customerId", "==", targetCustomerId)
+      );
+
+      const snap = await getDocs(q);
+      const pumpSet = new Set<string>();
+
+      snap.docs.forEach((d) => {
+        const data = d.data() as any;
+        const numbers = (data.pumpNumbers || []) as any[];
+        numbers.forEach((num) => {
+          if (num) pumpSet.add(String(num));
+        });
+      });
+
+      setCustomerPreviousPumps(Array.from(pumpSet));
+    } catch (err) {
+      console.error("loadCustomerPreviousPumps error:", err);
+      setCustomerPreviousPumps([]);
+    } finally {
+      setCustomerPumpsLoading(false);
+    }
   }
 
   function subscribeOrders() {
@@ -242,6 +286,7 @@ export default function EmployeeOrdersPage() {
         customerAddress: customers.find((c) => c.id === customerId)?.address,
         customerState: customers.find((c) => c.id === customerId)?.state,
         customerCountry: customers.find((c) => c.id === customerId)?.country,
+        customerPreviousPumps,
         createdByEmployeeName: employeeName,
         createdByEmployeeId: employeeId,
         status: "PENDING",
@@ -308,6 +353,17 @@ export default function EmployeeOrdersPage() {
       p.pumpNumber.toLowerCase().includes(pumpSearch.toLowerCase()) &&
       !pumpIds.includes(p.id)
   );
+
+  const activityOrders = [...orders].sort((a, b) => {
+    const toMs = (ts: any) => {
+      if (!ts) return 0;
+      if (typeof ts === "string") return new Date(ts).getTime();
+      if (ts?.toDate) return ts.toDate().getTime();
+      return 0;
+    };
+
+    return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
+  });
 
   /* ---------- UI ---------- */
   return (
@@ -397,6 +453,32 @@ export default function EmployeeOrdersPage() {
             ))}
           </select>
 
+          {customerId && (
+            <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-semibold">Customer Pump Reminder</p>
+              {customerPumpsLoading && (
+                <p className="text-xs text-white/60">Loading previous pumps...</p>
+              )}
+
+              {!customerPumpsLoading && customerPreviousPumps.length === 0 && (
+                <p className="text-xs text-white/60">No previous pumps found.</p>
+              )}
+
+              {!customerPumpsLoading && customerPreviousPumps.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {customerPreviousPumps.map((num) => (
+                    <span
+                      key={num}
+                      className="bg-white/10 text-xs px-3 py-1 rounded"
+                    >
+                      Pump #{num}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <p className="text-red-400 text-sm">{error}</p>}
           {info && <p className="text-green-400 text-sm">{info}</p>}
 
@@ -407,6 +489,25 @@ export default function EmployeeOrdersPage() {
           >
             {loading ? "CREATING..." : "CREATE ORDER"}
           </button>
+        </div>
+
+        {/* DRIVER ACTIVITY */}
+        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">Driver Activity</h2>
+              <p className="text-xs text-white/60">
+                Live updates from all delivery drivers
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDriverActivity(true)}
+              className="text-xs px-3 py-2 rounded bg-white/10 hover:bg-white/20"
+            >
+              View Activity
+            </button>
+          </div>
         </div>
 
         {/* ORDERS LIST */}
@@ -463,6 +564,50 @@ export default function EmployeeOrdersPage() {
             ))}
           </ul>
         </div>
+
+        {/* DRIVER ACTIVITY MODAL */}
+        {showDriverActivity && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center px-4">
+            <div className="bg-[#020617] w-full max-w-3xl rounded-xl p-6 space-y-4 border border-white/10">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Live Driver Activity</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowDriverActivity(false)}
+                  className="text-xs text-white/60 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+
+              {activityOrders.length === 0 && (
+                <p className="text-xs text-white/60">No activity yet.</p>
+              )}
+
+              <ul className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                {activityOrders.map((o) => (
+                  <li
+                    key={o.id}
+                    className="border border-white/10 rounded p-4 space-y-1"
+                  >
+                    <p className="text-sm font-semibold">
+                      {o.customerName} — Pumps: {o.pumpNumbers?.join(", ")}
+                    </p>
+                    <p className="text-xs text-white/60">
+                      Driver: {o.driverName || "Unassigned"}
+                    </p>
+                    <p className="text-xs">
+                      Status: <span className="text-yellow-400">{o.status}</span>
+                    </p>
+                    <p className="text-xs text-white/50">
+                      Last update: {formatDate(o.statusUpdatedAt || o.createdAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         <div className="text-center">
           <button
