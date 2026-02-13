@@ -66,6 +66,8 @@ type Order = {
   createdAt: any;
   assignedAt?: any;
   startedAt?: any;
+  arrivedAt?: any;
+  arrivedAtISO?: string;
   driverLatitude?: number;
   driverLongitude?: number;
 };
@@ -447,8 +449,39 @@ export default function DriverDashboardPage() {
     loadOrders();
   }
 
+  async function handleArrivedAtCustomer(order: Order) {
+    setSelectedOrder(order);
+    setShowDeliveryModal(true);
+
+    const liveLocation = await getDriverCurrentLocation();
+    const arrivedAtISO = new Date().toISOString();
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), {
+        arrivedAt: serverTimestamp(),
+        arrivedAtISO,
+        statusUpdatedAt: serverTimestamp(),
+        ...(liveLocation
+          ? {
+              driverLatitude: liveLocation.lat,
+              driverLongitude: liveLocation.lng,
+            }
+          : {}),
+      });
+
+      setDeliveryInfo(
+        `Arrival registered: ${new Date(arrivedAtISO).toLocaleString("en-US")}`
+      );
+      setTimeout(() => setDeliveryInfo(""), 6000);
+    } catch (err) {
+      console.warn("Failed to register arrival at customer:", err);
+    }
+  }
+
   async function handleCompleteDelivery() {
     if (!selectedOrder) return;
+
+    const order = selectedOrder;
 
     setDeliveryError("");
     setDeliveryInfo("");
@@ -501,71 +534,30 @@ export default function DriverDashboardPage() {
     let completed = false;
 
     try {
-      // Obtener geolocalización (cliente)
-      const location: { lat: number; lng: number } = await new Promise(
-        (resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) =>
-              resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => reject(new Error("Location required"))
-          );
-        }
-      );
-
-      // Obtener IP cliente
-      let ip = "";
-      try {
-        const res = await fetch("https://api.ipify.org?format=json");
-        const data = await res.json();
-        ip = data.ip;
-      } catch (err) {
-        console.warn("Failed to obtain client IP:", err);
-      }
+      const [location, ip] = await Promise.all([
+        getDriverCurrentLocation(),
+        (async () => {
+          try {
+            const res = await fetch("https://api.ipify.org?format=json");
+            const data = await res.json();
+            return data.ip as string;
+          } catch (err) {
+            console.warn("Failed to obtain client IP:", err);
+            return "";
+          }
+        })(),
+      ]);
 
       const deliveredAtISO = new Date().toISOString();
 
-      // 1️⃣ Subir imagenes a Storage (customer + driver)
-      const signatureUrl = await uploadSignatureToStorage(
-        `${selectedOrder.id}-customer`,
-        signature
-      );
+      const [signatureUrl, driverSignatureUrl, signatureHash, driverSignatureHash] =
+        await Promise.all([
+          uploadSignatureToStorage(`${order.id}-customer`, signature),
+          uploadSignatureToStorage(`${order.id}-driver`, driverSignature),
+          generateSHA256Hash(signature),
+          generateSHA256Hash(driverSignature),
+        ]);
 
-      const driverSignatureUrl = await uploadSignatureToStorage(
-        `${selectedOrder.id}-driver`,
-        driverSignature
-      );
-
-      // 2️⃣ Generar hashes
-      const signatureHash = await generateSHA256Hash(signature);
-      const driverSignatureHash = await generateSHA256Hash(driverSignature);
-
-      // 3️⃣ Generar PDF legal
-      let legalPdfUrl = "";
-      try {
-        const pdfBlob = await generateDeliveryPDF({
-          orderId: selectedOrder.id,
-          customerName: selectedOrder.customerName,
-          driverName: driverName || "",
-          pumpNumbers: selectedOrder.pumpNumbers,
-          deliveredAt: deliveredAtISO,
-          ip,
-          lat: location.lat,
-          lng: location.lng,
-          signatureUrl,
-          driverSignatureUrl,
-        });
-
-        const pdfRef = storageRef(
-          storage,
-          `delivery_pdfs/${selectedOrder.id}.pdf`
-        );
-        await uploadBytes(pdfRef, pdfBlob);
-        legalPdfUrl = await getDownloadURL(pdfRef);
-      } catch (err) {
-        console.error("Failed to generate or upload PDF:", err);
-      }
-
-      // 4️⃣ Guardar en collection de firmas (solo URL + hash + meta)
       const allReturned =
         previousPumpsStatusList.length > 0 &&
         previousPumpsStatusList.every((entry) => entry.returned);
@@ -573,13 +565,20 @@ export default function DriverDashboardPage() {
         ? null
         : allReturned;
 
-      await addDoc(collection(db, "deliverySignatures"), {
-        orderId: selectedOrder.id,
-        pharmacyId: selectedOrder.pharmacyId,
-        pharmacyName: selectedOrder.pharmacyName,
-        pumpNumbers: selectedOrder.pumpNumbers,
-        customerName: selectedOrder.customerName,
-        customerAddress: selectedOrder.customerAddress,
+      const deliveryLocationData = location
+        ? {
+            deliveredLatitude: location.lat,
+            deliveredLongitude: location.lng,
+          }
+        : {};
+
+      const baseDeliveryData = {
+        orderId: order.id,
+        pharmacyId: order.pharmacyId,
+        pharmacyName: order.pharmacyName,
+        pumpNumbers: order.pumpNumbers,
+        customerName: order.customerName,
+        customerAddress: order.customerAddress,
         receivedByName: receiverName.trim(),
         previousPumps: previousPumpsList,
         previousPumpsReturned,
@@ -591,103 +590,125 @@ export default function DriverDashboardPage() {
         signatureHash,
         driverSignatureUrl,
         driverSignatureHash,
-        deliveredAt: serverTimestamp(),
         deliveredAtISO,
         deliveredFromIP: ip,
-        deliveredLatitude: location.lat,
-        deliveredLongitude: location.lng,
-        legalPdfUrl,
-      });
+        ...deliveryLocationData,
+      };
 
-      // 5️⃣ Guardar solo URL + hash + meta en la orden (NO base64)
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        signatureUrl,
-        signatureHash,
-        driverSignatureUrl,
-        driverSignatureHash,
-        deliveredAt: serverTimestamp(),
-        deliveredAtISO,
-        deliveredFromIP: ip,
-        deliveredLatitude: location.lat,
-        deliveredLongitude: location.lng,
-        legalPdfUrl,
-        receivedByName: receiverName.trim(),
-        previousPumps: previousPumpsList,
-        previousPumpsReturned,
-        previousPumpsStatus: previousPumpsStatusList,
-        previousPumpsReturnToPharmacy,
-        status: "DELIVERED",
-        statusUpdatedAt: serverTimestamp(),
-      });
-
-      if (notReturnedList.length > 0 && selectedOrder.customerId) {
-        try {
-          const customerSnap = await getDoc(
-            doc(db, "customers", selectedOrder.customerId)
-          );
-          const customerEmail = customerSnap.data()?.email as string | undefined;
-
-          if (customerEmail) {
-            const sentAt = new Date().toLocaleString("en-US");
-            const reasonsHtml = notReturnedList
-              .map(
-                (entry) =>
-                  `<li>Pump #${entry.pumpNumber}: ${entry.reason || "No reason provided"}</li>`
-              )
-              .join("");
-
-            await sendAppEmail({
-              to: customerEmail,
-              subject: "Pumps Not Returned",
-              html: `
-                <p>Hello ${selectedOrder.customerName},</p>
-                <p>We did not receive the following pumps during the last delivery:</p>
-                <ul>${reasonsHtml}</ul>
-                <p><strong>Recorded:</strong> ${sentAt}</p>
-                <p>Please return these pumps on the next delivery.</p>
-              `,
-              text: `Pumps not returned: ${notReturnedList
-                .map((entry) => `${entry.pumpNumber} (${entry.reason || "No reason"})`)
-                .join(", ")}. Recorded: ${sentAt}. Please return these pumps on the next delivery.`,
-            });
-          }
-        } catch (err) {
-          console.warn("Customer email send failed:", err);
-        }
-      }
-
-    // Actualizar estado de bombas y registrar movimiento (DELIVERED)
-    for (const pumpNumber of selectedOrder!.pumpNumbers) {
-      const q = query(
-        collection(db, "pumps"),
-        where("pumpNumber", "==", pumpNumber),
-        where("pharmacyId", "==", selectedOrder!.pharmacyId)
-      );
-
-      const snap = await getDocs(q);
-
-      if (!snap.empty) {
-        const pumpDoc = snap.docs[0];
-
-        await updateDoc(doc(db, "pumps", pumpDoc.id), {
+      const [deliverySignatureRef] = await Promise.all([
+        addDoc(collection(db, "deliverySignatures"), {
+          ...baseDeliveryData,
+          deliveredAt: serverTimestamp(),
+          legalPdfUrl: "",
+        }),
+        updateDoc(doc(db, "orders", order.id), {
+          ...baseDeliveryData,
+          deliveredAt: serverTimestamp(),
+          legalPdfUrl: "",
           status: "DELIVERED",
-        });
-
-        await logPumpMovement({
-          pumpId: pumpDoc.id,
-          pumpNumber,
-          pharmacyId: selectedOrder!.pharmacyId,
-          orderId: selectedOrder!.id,
-          action: "DELIVERED",
-          performedById: driverId!,
-          performedByName: driverName!,
-          role: "DRIVER",
-        });
-      }
-    }
+          statusUpdatedAt: serverTimestamp(),
+        }),
+      ]);
 
       completed = true;
       loadOrders();
+
+      void (async () => {
+        let legalPdfUrl = "";
+
+        try {
+          const pdfBlob = await generateDeliveryPDF({
+            orderId: order.id,
+            customerName: order.customerName,
+            driverName: driverName || "",
+            pumpNumbers: order.pumpNumbers,
+            deliveredAt: deliveredAtISO,
+            ip,
+            lat: location?.lat ?? 0,
+            lng: location?.lng ?? 0,
+            signatureUrl,
+            driverSignatureUrl,
+          });
+
+          const pdfRef = storageRef(storage, `delivery_pdfs/${order.id}.pdf`);
+          await uploadBytes(pdfRef, pdfBlob);
+          legalPdfUrl = await getDownloadURL(pdfRef);
+
+          await Promise.all([
+            updateDoc(doc(db, "orders", order.id), { legalPdfUrl }),
+            updateDoc(doc(db, "deliverySignatures", deliverySignatureRef.id), {
+              legalPdfUrl,
+            }),
+          ]);
+        } catch (err) {
+          console.error("Failed to generate or upload PDF:", err);
+        }
+
+        if (notReturnedList.length > 0 && order.customerId) {
+          try {
+            const customerSnap = await getDoc(doc(db, "customers", order.customerId));
+            const customerEmail = customerSnap.data()?.email as string | undefined;
+
+            if (customerEmail) {
+              const sentAt = new Date().toLocaleString("en-US");
+              const reasonsHtml = notReturnedList
+                .map(
+                  (entry) =>
+                    `<li>Pump #${entry.pumpNumber}: ${entry.reason || "No reason provided"}</li>`
+                )
+                .join("");
+
+              await sendAppEmail({
+                to: customerEmail,
+                subject: "Pumps Not Returned",
+                html: `
+                  <p>Hello ${order.customerName},</p>
+                  <p>We did not receive the following pumps during the last delivery:</p>
+                  <ul>${reasonsHtml}</ul>
+                  <p><strong>Recorded:</strong> ${sentAt}</p>
+                  <p>Please return these pumps on the next delivery.</p>
+                `,
+                text: `Pumps not returned: ${notReturnedList
+                  .map((entry) => `${entry.pumpNumber} (${entry.reason || "No reason"})`)
+                  .join(", ")}. Recorded: ${sentAt}. Please return these pumps on the next delivery.`,
+              });
+            }
+          } catch (err) {
+            console.warn("Customer email send failed:", err);
+          }
+        }
+
+        await Promise.all(
+          order.pumpNumbers.map(async (pumpNumber) => {
+            const q = query(
+              collection(db, "pumps"),
+              where("pumpNumber", "==", pumpNumber),
+              where("pharmacyId", "==", order.pharmacyId)
+            );
+
+            const snap = await getDocs(q);
+
+            if (!snap.empty) {
+              const pumpDoc = snap.docs[0];
+
+              await updateDoc(doc(db, "pumps", pumpDoc.id), {
+                status: "DELIVERED",
+              });
+
+              await logPumpMovement({
+                pumpId: pumpDoc.id,
+                pumpNumber,
+                pharmacyId: order.pharmacyId,
+                orderId: order.id,
+                action: "DELIVERED",
+                performedById: driverId!,
+                performedByName: driverName!,
+                role: "DRIVER",
+              });
+            }
+          })
+        );
+      })();
     } catch (err) {
       console.error("handleCompleteDelivery error:", err);
       setDeliveryError("Failed to confirm delivery. Please try again.");
@@ -702,7 +723,10 @@ export default function DriverDashboardPage() {
       setDriverSignature("");
       setReceiverName("");
       setPreviousPumpsStatus({});
-      setDeliveryInfo("Delivery saved successfully.");
+      setDeliveryInfo(
+        `Delivery registered successfully at ${new Date().toLocaleString("en-US")}.`
+      );
+      alert("Delivery registered successfully.");
       setTimeout(() => setDeliveryInfo(""), 6000);
     }
   }
@@ -825,11 +849,13 @@ export default function DriverDashboardPage() {
                     <p className="text-xs text-green-400">
                       🚚 On the way to deliver
                     </p>
+                    {o.arrivedAtISO && (
+                      <p className="text-xs text-white/60">
+                        Arrival: {new Date(o.arrivedAtISO).toLocaleString("en-US")}
+                      </p>
+                    )}
                     <button
-                      onClick={() => {
-                        setSelectedOrder(o);
-                        setShowDeliveryModal(true);
-                      }}
+                      onClick={() => handleArrivedAtCustomer(o)}
                       className="w-full bg-green-600 py-2 rounded"
                     >
                       ARRIVED AT CUSTOMER
