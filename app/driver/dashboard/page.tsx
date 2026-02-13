@@ -791,7 +791,7 @@ export default function DriverDashboardPage() {
           <button
             type="button"
             onClick={() => setDashboardSection("home")}
-            className={`py-2 rounded-lg text-xs font-semibold border ${
+            className={`py-2 rounded-lg text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
               dashboardSection === "home"
                 ? "bg-white/15 border-white/40"
                 : "bg-black/30 border-white/10 hover:border-white/30"
@@ -805,7 +805,7 @@ export default function DriverDashboardPage() {
           <button
             type="button"
             onClick={() => setDashboardSection("active")}
-            className={`py-2 rounded-lg text-xs font-semibold border ${
+            className={`py-2 rounded-lg text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40 ${
               dashboardSection === "active"
                 ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-200"
                 : "bg-black/30 border-white/10 hover:border-white/30"
@@ -819,7 +819,7 @@ export default function DriverDashboardPage() {
           <button
             type="button"
             onClick={() => setDashboardSection("returns")}
-            className={`py-2 rounded-lg text-xs font-semibold border ${
+            className={`py-2 rounded-lg text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/40 ${
               dashboardSection === "returns"
                 ? "bg-amber-500/20 border-amber-400/50 text-amber-200"
                 : "bg-black/30 border-white/10 hover:border-white/30"
@@ -833,7 +833,7 @@ export default function DriverDashboardPage() {
           <button
             type="button"
             onClick={() => setDashboardSection("connect")}
-            className={`py-2 rounded-lg text-xs font-semibold border ${
+            className={`py-2 rounded-lg text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/40 ${
               dashboardSection === "connect"
                 ? "bg-indigo-500/20 border-indigo-400/50 text-indigo-200"
                 : "bg-black/30 border-white/10 hover:border-white/30"
@@ -847,7 +847,7 @@ export default function DriverDashboardPage() {
           <button
             type="button"
             onClick={() => router.push("/driver/delivery-pdfs")}
-            className="py-2 rounded-lg text-xs font-semibold border bg-cyan-600/30 border-cyan-500/40 hover:bg-cyan-600/40"
+            className="py-2 rounded-lg text-xs font-semibold border bg-cyan-600/30 border-cyan-500/40 hover:bg-cyan-600/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40"
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <FileText size={14} />
@@ -875,7 +875,7 @@ export default function DriverDashboardPage() {
               {availableOrders.map((o) => (
                 <li
                   key={o.id}
-                  className="border border-emerald-500/30 rounded-xl p-5 space-y-3 bg-emerald-500/5"
+                  className="border border-emerald-500/30 rounded-xl p-5 space-y-3 bg-emerald-500/5 transition-all duration-200 hover:border-emerald-400/50 hover:bg-emerald-500/10"
                 >
                   <p className="font-semibold text-lg">{o.pharmacyName}</p>
                   <p className="text-sm text-white/90">{o.customerName}</p>
@@ -894,7 +894,7 @@ export default function DriverDashboardPage() {
 
                   <button
                     onClick={() => handleAcceptOrder(o.id)}
-                    className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-semibold"
+                    className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/25 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300/40"
                   >
                     ACCEPT ORDER
                   </button>
@@ -925,7 +925,7 @@ export default function DriverDashboardPage() {
                   {o.status === "ASSIGNED" && (
                     <button
                       onClick={() => handleOnWayToPharmacy(o.id)}
-                      className="w-full bg-yellow-600 py-2 rounded"
+                      className="w-full bg-yellow-600 py-2 rounded transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-yellow-500/20 active:scale-[0.99]"
                     >
                       ON THE WAY TO PHARMACY
                     </button>
@@ -937,7 +937,7 @@ export default function DriverDashboardPage() {
                         setSelectedOrder(o);
                         setShowPickupModal(true);
                       }}
-                      className="w-full bg-indigo-600 py-2 rounded"
+                      className="w-full bg-indigo-600 py-2 rounded transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.99]"
                     >
                       ARRIVED AT PHARMACY
                     </button>
@@ -952,7 +952,7 @@ export default function DriverDashboardPage() {
                       )}
                       <button
                         onClick={() => handleArrivedAtCustomer(o)}
-                        className="w-full bg-green-600 py-2 rounded"
+                        className="w-full bg-green-600 py-2 rounded transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-green-500/20 active:scale-[0.99]"
                       >
                         ARRIVED AT CUSTOMER
                       </button>
@@ -1019,7 +1019,7 @@ export default function DriverDashboardPage() {
             <button
               onClick={handleAddPharmacy}
               disabled={loading}
-              className="w-full bg-indigo-600 py-2 rounded"
+              className="w-full bg-indigo-600 py-2 rounded transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/20 active:scale-[0.99] disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >
               CONNECT PHARMACY
             </button>
