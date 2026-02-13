@@ -10,7 +10,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   addDoc,
@@ -69,6 +69,7 @@ function formatDate(ts: any) {
 
 export default function EmployeeOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   /* ---------- Context ---------- */
   const pharmacyId =
@@ -104,6 +105,7 @@ export default function EmployeeOrdersPage() {
   const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
   const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
   const [showDriverActivity, setShowDriverActivity] = useState(false);
+  const [orderSearch, setOrderSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -130,6 +132,15 @@ export default function EmployeeOrdersPage() {
       if (unsubscribe) unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const view = searchParams.get("view");
+    if (view === "activity") {
+      setShowDriverActivity(true);
+    } else if (view === "orders") {
+      setShowDriverActivity(false);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!customerId) {
@@ -365,6 +376,18 @@ export default function EmployeeOrdersPage() {
     return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
   });
 
+  const filteredOrders = orders.filter((o) => {
+    const term = orderSearch.trim().toLowerCase();
+    if (!term) return true;
+
+    const customerMatch = o.customerName?.toLowerCase().includes(term);
+    const pumpMatch = (o.pumpNumbers || []).some((num) =>
+      String(num).toLowerCase().includes(term)
+    );
+
+    return customerMatch || pumpMatch;
+  });
+
   /* ---------- UI ---------- */
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
@@ -512,10 +535,35 @@ export default function EmployeeOrdersPage() {
 
         {/* ORDERS LIST */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6">
-          <h2 className="font-semibold mb-4">Orders</h2>
+          <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
+            <h2 className="font-semibold">Orders</h2>
+            <div className="relative w-full md:max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                placeholder="Search by customer or pump..."
+                className="w-full p-2 pl-9 rounded bg-black border border-white/10"
+              />
+            </div>
+          </div>
 
           <ul className="space-y-3">
-            {orders.map((o) => (
+            {filteredOrders.map((o) => (
               <li
                 key={o.id}
                 className="border border-white/10 rounded p-4 space-y-1"

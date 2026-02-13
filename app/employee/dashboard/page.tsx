@@ -95,6 +95,48 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
+          {/* DRIVER ACTIVITY */}
+          <div
+            onClick={() => router.push("/employee/orders?view=activity")}
+            className="cursor-pointer bg-black/40 border border-cyan-500/30 hover:border-cyan-500
+                       rounded-xl p-6 transition-all hover:scale-[1.02] hover:bg-black/60"
+          >
+            <div className="space-y-3">
+              <div className="text-cyan-400 text-2xl">🚚</div>
+              <h2 className="text-xl font-semibold">
+                Driver Activity
+              </h2>
+              <p className="text-sm text-white/60">
+                View live updates on what drivers are doing
+                across all deliveries.
+              </p>
+              <p className="text-xs text-cyan-400">
+                View activity feed →
+              </p>
+            </div>
+          </div>
+
+          {/* ORDER SEARCH */}
+          <div
+            onClick={() => router.push("/employee/orders?view=orders")}
+            className="cursor-pointer bg-black/40 border border-purple-500/30 hover:border-purple-500
+                       rounded-xl p-6 transition-all hover:scale-[1.02] hover:bg-black/60"
+          >
+            <div className="space-y-3">
+              <div className="text-purple-400 text-2xl">🔍</div>
+              <h2 className="text-xl font-semibold">
+                Order Search
+              </h2>
+              <p className="text-sm text-white/60">
+                Search created orders by customer name
+                or pump number.
+              </p>
+              <p className="text-xs text-purple-400">
+                Open search view →
+              </p>
+            </div>
+          </div>
+
         </div>
 
         {/* FOOTER NOTE */}
