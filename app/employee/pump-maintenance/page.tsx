@@ -84,6 +84,7 @@ export default function PumpMaintenancePage() {
       const allDone = cleaned && calibrated && inspected;
 
       await updateDoc(doc(db, "pumps", pumpId), {
+        status: allDone ? "AVAILABLE" : "IN_MAINTENANCE",
         maintenanceStatus: {
           cleaned,
           calibrated,

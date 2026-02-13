@@ -40,6 +40,8 @@ type Pump = {
   id: string;
   pumpNumber: string;
   brand?: string | null;
+  status?: string | null;
+  maintenanceDue?: boolean;
   createdBy: string;
   createdById: string;
   createdAt: any;
@@ -72,6 +74,7 @@ export default function EmployeePumpsPage() {
   const [pumpNumber, setPumpNumber] = useState("");
   const [brand, setBrand] = useState("");
   const [pumps, setPumps] = useState<Pump[]>([]);
+  const [statusFilter, setStatusFilter] = useState<"all" | "maintenance" | "available">("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -99,7 +102,16 @@ export default function EmployeePumpsPage() {
       ...(d.data() as any),
     }));
 
-    setPumps(list);
+    const sorted = [...list].sort((a, b) => {
+      const aMaintenance = a.status === "IN_MAINTENANCE" || a.maintenanceDue === true;
+      const bMaintenance = b.status === "IN_MAINTENANCE" || b.maintenanceDue === true;
+
+      if (aMaintenance !== bMaintenance) return aMaintenance ? -1 : 1;
+
+      return String(a.pumpNumber || "").localeCompare(String(b.pumpNumber || ""));
+    });
+
+    setPumps(sorted);
   }
 
   /* ➕ Register pump */
@@ -149,6 +161,13 @@ export default function EmployeePumpsPage() {
     await deleteDoc(doc(db, "pumps", id));
     await loadPumps();
   }
+
+  const filteredPumps = pumps.filter((p) => {
+    const inMaintenance = p.status === "IN_MAINTENANCE" || p.maintenanceDue === true;
+    if (statusFilter === "maintenance") return inMaintenance;
+    if (statusFilter === "available") return !inMaintenance;
+    return true;
+  });
 
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
@@ -205,14 +224,50 @@ export default function EmployeePumpsPage() {
             Registered Pumps
           </h2>
 
-          {pumps.length === 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              className={`text-xs px-3 py-1 rounded border ${
+                statusFilter === "all"
+                  ? "bg-white/20 border-white/30"
+                  : "bg-black/30 border-white/10"
+              }`}
+            >
+              All ({pumps.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("maintenance")}
+              className={`text-xs px-3 py-1 rounded border ${
+                statusFilter === "maintenance"
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-200"
+                  : "bg-black/30 border-white/10"
+              }`}
+            >
+              In Maintenance ({pumps.filter((p) => p.status === "IN_MAINTENANCE" || p.maintenanceDue === true).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("available")}
+              className={`text-xs px-3 py-1 rounded border ${
+                statusFilter === "available"
+                  ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-200"
+                  : "bg-black/30 border-white/10"
+              }`}
+            >
+              Available ({pumps.filter((p) => !(p.status === "IN_MAINTENANCE" || p.maintenanceDue === true)).length})
+            </button>
+          </div>
+
+          {filteredPumps.length === 0 && (
             <p className="text-white/50 text-sm">
-              No medical pumps registered yet.
+              No pumps found for this filter.
             </p>
           )}
 
           <ul className="space-y-3">
-            {pumps.map((p) => (
+            {filteredPumps.map((p) => (
               <li
                 key={p.id}
                 className="border border-white/10 rounded p-4 flex justify-between items-start"
@@ -220,6 +275,21 @@ export default function EmployeePumpsPage() {
                 <div className="space-y-1">
                   <p className="font-medium">
                     Pump #{p.pumpNumber}
+                  </p>
+
+                  <p className="text-xs text-white/70">
+                    Status:{" "}
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded border ${
+                        p.status === "IN_MAINTENANCE" || p.maintenanceDue
+                          ? "text-amber-300 border-amber-500/40 bg-amber-500/10"
+                          : "text-emerald-300 border-emerald-500/40 bg-emerald-500/10"
+                      }`}
+                    >
+                      {p.status === "IN_MAINTENANCE" || p.maintenanceDue
+                        ? "IN_MAINTENANCE"
+                        : "AVAILABLE"}
+                    </span>
                   </p>
 
                   {p.brand && (

@@ -32,6 +32,7 @@ type Pump = {
   id: string;
   pumpNumber: string;
   status?: string | null;
+  maintenanceDue?: boolean;
 };
 
 type Customer = {
@@ -176,9 +177,10 @@ export default function EmployeeOrdersPage() {
           id: d.id,
           pumpNumber: data.pumpNumber || String(data.pump || ""),
           status: data.status ?? null,
+          maintenanceDue: data.maintenanceDue === true,
         } as Pump;
       })
-      .filter((p) => !p.status || p.status === "AVAILABLE");
+      .filter((p) => (!p.status || p.status === "AVAILABLE") && !p.maintenanceDue);
 
     setPumps(list);
   }
@@ -468,83 +470,20 @@ export default function EmployeeOrdersPage() {
         <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
           <h2 className="font-semibold">Create New Order</h2>
 
-          <input
-            ref={pumpSearchRef}
-            value={pumpSearch}
-            onChange={(e) => handlePumpScannerBatch(e.target.value)}
-            onPaste={(e) => {
-              const pasted = e.clipboardData.getData("text");
-              if (!pasted) return;
-              e.preventDefault();
-              handlePumpScannerBatch(pasted);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handlePumpScannerEnter();
-              }
-            }}
-            placeholder="Search pump (type or scan barcode/QR)..."
-            className="w-full p-2 rounded bg-black border border-white/10"
-            autoFocus
-          />
-
-          {pumpSearch && (
-            <div className="border border-white/10 rounded bg-black max-h-40 overflow-y-auto">
-              {filteredPumps.length === 0 && (
-                <p className="text-xs text-white/50 p-2">
-                  No pumps found
-                </p>
-              )}
-
-              {filteredPumps.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => {
-                    setPumpIds((prev) => [...prev, p.id]);
-                    setPumpNumbers((prev) => [...prev, p.pumpNumber]);
-                    setPumpSearch("");
-                    focusPumpSearchInput();
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-white/10"
-                >
-                  Pump #{p.pumpNumber}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {pumpNumbers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {pumpNumbers.map((num, idx) => (
-                <span
-                  key={num}
-                  className="bg-white/10 text-sm px-3 py-1 rounded flex items-center gap-2"
-                >
-                  Pump #{num}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPumpNumbers((prev) =>
-                        prev.filter((_, i) => i !== idx)
-                      );
-                      setPumpIds((prev) =>
-                        prev.filter((_, i) => i !== idx)
-                      );
-                    }}
-                    className="text-red-400 hover:text-red-500"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
           <select
             value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
+            onChange={(e) => {
+              const nextCustomerId = e.target.value;
+              const changedCustomer = customerId && customerId !== nextCustomerId;
+
+              setCustomerId(nextCustomerId);
+
+              if (changedCustomer) {
+                setPumpIds([]);
+                setPumpNumbers([]);
+                setPumpSearch("");
+              }
+            }}
             className="w-full p-2 rounded bg-black border border-white/10"
           >
             <option value="">Select Customer</option>
@@ -555,8 +494,102 @@ export default function EmployeeOrdersPage() {
             ))}
           </select>
 
+          {!customerId && (
+            <p className="text-xs text-white/60">
+              Select a customer first to load customer info and add medical pumps.
+            </p>
+          )}
+
           {customerId && (
-            <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-2">
+            <>
+              <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold">Customer Information</p>
+                <p className="text-xs text-white/70">
+                  Name: {customers.find((c) => c.id === customerId)?.name}
+                </p>
+                <p className="text-xs text-white/60">
+                  City: {customers.find((c) => c.id === customerId)?.city || "—"}
+                </p>
+                <p className="text-xs text-white/60">
+                  Address: {customers.find((c) => c.id === customerId)?.address || "—"}
+                </p>
+              </div>
+
+              <input
+                ref={pumpSearchRef}
+                value={pumpSearch}
+                onChange={(e) => handlePumpScannerBatch(e.target.value)}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!pasted) return;
+                  e.preventDefault();
+                  handlePumpScannerBatch(pasted);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handlePumpScannerEnter();
+                  }
+                }}
+                placeholder="Search pump (type or scan barcode/QR)..."
+                className="w-full p-2 rounded bg-black border border-white/10"
+                autoFocus
+              />
+
+              {pumpSearch && (
+                <div className="border border-white/10 rounded bg-black max-h-40 overflow-y-auto">
+                  {filteredPumps.length === 0 && (
+                    <p className="text-xs text-white/50 p-2">
+                      No pumps found
+                    </p>
+                  )}
+
+                  {filteredPumps.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setPumpIds((prev) => [...prev, p.id]);
+                        setPumpNumbers((prev) => [...prev, p.pumpNumber]);
+                        setPumpSearch("");
+                        focusPumpSearchInput();
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/10"
+                    >
+                      Pump #{p.pumpNumber}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {pumpNumbers.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {pumpNumbers.map((num, idx) => (
+                    <span
+                      key={num}
+                      className="bg-white/10 text-sm px-3 py-1 rounded flex items-center gap-2"
+                    >
+                      Pump #{num}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPumpNumbers((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          );
+                          setPumpIds((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          );
+                        }}
+                        className="text-red-400 hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-2">
               <p className="text-sm font-semibold">Customer Pump Reminder</p>
               {customerPumpsLoading && (
                 <p className="text-xs text-white/60">Loading previous pumps...</p>
@@ -584,7 +617,8 @@ export default function EmployeeOrdersPage() {
                   Reminder for driver: {customers.find((c) => c.id === customerId)?.returnReminderNote}
                 </p>
               )}
-            </div>
+              </div>
+            </>
           )}
 
           {error && <p className="text-red-400 text-sm">{error}</p>}

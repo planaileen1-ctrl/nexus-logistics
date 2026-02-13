@@ -201,6 +201,7 @@ export default function PumpReturnsPage() {
       if (!pumpSnap.empty) {
         const pumpDoc = pumpSnap.docs[0];
         await updateDoc(doc(db, "pumps", pumpDoc.id), {
+          status: "IN_MAINTENANCE",
           maintenanceDue: true,
           maintenanceDueAt: serverTimestamp(),
           maintenanceStatus: {
