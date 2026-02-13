@@ -170,8 +170,9 @@ export default function DriverDashboardPage() {
   const [employeeSignature, setEmployeeSignature] = useState("");
   const [driverPickupSignature, setDriverPickupSignature] = useState("");
   const [receiverName, setReceiverName] = useState("");
-  const [previousPumpsReturned, setPreviousPumpsReturned] = useState<null | boolean>(null);
-  const [previousPumpsReturnReason, setPreviousPumpsReturnReason] = useState("");
+  const [previousPumpsStatus, setPreviousPumpsStatus] = useState<
+    Record<string, { returned: boolean; reason: string }>
+  >({});
 
   const [loading, setLoading] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
@@ -185,6 +186,19 @@ export default function DriverDashboardPage() {
       if (driverId) loadConnectedPharmacies();
     })();
   }, []);
+
+  useEffect(() => {
+    if (!showDeliveryModal || !selectedOrder) return;
+
+    const previous = selectedOrder.customerPreviousPumps || [];
+    const initial: Record<string, { returned: boolean; reason: string }> = {};
+
+    previous.forEach((num) => {
+      initial[String(num)] = { returned: true, reason: "" };
+    });
+
+    setPreviousPumpsStatus(initial);
+  }, [showDeliveryModal, selectedOrder]);
 
   async function loadConnectedPharmacies() {
     const snap = await getDocs(
@@ -383,14 +397,25 @@ export default function DriverDashboardPage() {
       return;
     }
 
-    if (selectedOrder.customerPreviousPumps && selectedOrder.customerPreviousPumps.length > 0) {
-      if (previousPumpsReturned === null) {
-        setDeliveryError("Please confirm whether previous pumps were returned.");
-        return;
-      }
+    const previousPumpsList = selectedOrder.customerPreviousPumps || [];
+    const previousPumpsStatusList = previousPumpsList.map((num) => {
+      const key = String(num);
+      const status = previousPumpsStatus[key];
 
-      if (previousPumpsReturned === false && !previousPumpsReturnReason.trim()) {
-        setDeliveryError("Please provide a reason for not returning pumps.");
+      return {
+        pumpNumber: key,
+        returned: status?.returned ?? true,
+        reason: (status?.reason || "").trim(),
+      };
+    });
+
+    if (previousPumpsStatusList.length > 0) {
+      const missingReason = previousPumpsStatusList.find(
+        (entry) => !entry.returned && !entry.reason
+      );
+
+      if (missingReason) {
+        setDeliveryError("Please provide a reason for each pump not returned.");
         return;
       }
     }
@@ -464,6 +489,13 @@ export default function DriverDashboardPage() {
       }
 
       // 4️⃣ Guardar en collection de firmas (solo URL + hash + meta)
+      const allReturned =
+        previousPumpsStatusList.length > 0 &&
+        previousPumpsStatusList.every((entry) => entry.returned);
+      const previousPumpsReturned = previousPumpsStatusList.length === 0
+        ? null
+        : allReturned;
+
       await addDoc(collection(db, "deliverySignatures"), {
         orderId: selectedOrder.id,
         pharmacyId: selectedOrder.pharmacyId,
@@ -472,9 +504,9 @@ export default function DriverDashboardPage() {
         customerName: selectedOrder.customerName,
         customerAddress: selectedOrder.customerAddress,
         receivedByName: receiverName.trim(),
-        previousPumps: selectedOrder.customerPreviousPumps || [],
+        previousPumps: previousPumpsList,
         previousPumpsReturned,
-        previousPumpsReturnReason: previousPumpsReturnReason.trim(),
+        previousPumpsStatus: previousPumpsStatusList,
         driverId,
         driverName,
         signatureUrl,
@@ -502,9 +534,9 @@ export default function DriverDashboardPage() {
         deliveredLongitude: location.lng,
         legalPdfUrl,
         receivedByName: receiverName.trim(),
-        previousPumps: selectedOrder.customerPreviousPumps || [],
+        previousPumps: previousPumpsList,
         previousPumpsReturned,
-        previousPumpsReturnReason: previousPumpsReturnReason.trim(),
+        previousPumpsStatus: previousPumpsStatusList,
         status: "DELIVERED",
         statusUpdatedAt: serverTimestamp(),
       });
@@ -554,8 +586,7 @@ export default function DriverDashboardPage() {
       setSignature(null);
       setDriverSignature("");
       setReceiverName("");
-      setPreviousPumpsReturned(null);
-      setPreviousPumpsReturnReason("");
+      setPreviousPumpsStatus({});
       setDeliveryInfo("Delivery saved successfully.");
       setTimeout(() => setDeliveryInfo(""), 6000);
     }
@@ -786,15 +817,15 @@ export default function DriverDashboardPage() {
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
             <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-full max-w-md">
               <p className="font-semibold">
-                Cliente: {selectedOrder.customerName}
+                Customer: {selectedOrder.customerName}
               </p>
 
               <div className="space-y-1">
-                <label className="text-xs text-white/70">Empleado</label>
+                <label className="text-xs text-white/70">Receiver Name</label>
                 <input
                   value={receiverName}
                   onChange={(e) => setReceiverName(e.target.value)}
-                  placeholder="Nombre del empleado que recibe"
+                  placeholder="Name of the person receiving"
                   className="w-full p-2 rounded bg-black border border-white/10"
                 />
               </div>
@@ -816,49 +847,58 @@ export default function DriverDashboardPage() {
                 selectedOrder.customerPreviousPumps.length > 0 && (
                   <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-3">
                     <p className="text-sm font-semibold">Previous Pumps To Return</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedOrder.customerPreviousPumps.map((num) => (
-                        <span
-                          key={num}
-                          className="bg-white/10 text-xs px-3 py-1 rounded"
-                        >
-                          Pump #{num}
-                        </span>
-                      ))}
-                    </div>
+                    <div className="space-y-3">
+                      {selectedOrder.customerPreviousPumps.map((num) => {
+                        const key = String(num);
+                        const status = previousPumpsStatus[key] || {
+                          returned: true,
+                          reason: "",
+                        };
 
-                    <div className="space-y-2">
-                      <p className="text-xs text-white/70">Were these pumps returned?</p>
-                      <div className="flex items-center gap-4 text-xs">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="previousPumpsReturned"
-                            checked={previousPumpsReturned === true}
-                            onChange={() => setPreviousPumpsReturned(true)}
-                          />
-                          Yes
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="radio"
-                            name="previousPumpsReturned"
-                            checked={previousPumpsReturned === false}
-                            onChange={() => setPreviousPumpsReturned(false)}
-                          />
-                          No
-                        </label>
-                      </div>
+                        return (
+                          <div
+                            key={key}
+                            className="border border-white/10 rounded p-3 space-y-2"
+                          >
+                            <label className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={status.returned}
+                                onChange={(e) =>
+                                  setPreviousPumpsStatus((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      returned: e.target.checked,
+                                      reason: e.target.checked
+                                        ? ""
+                                        : prev[key]?.reason || "",
+                                    },
+                                  }))
+                                }
+                              />
+                              Pump #{key} returned
+                            </label>
 
-                      {previousPumpsReturned === false && (
-                        <textarea
-                          value={previousPumpsReturnReason}
-                          onChange={(e) => setPreviousPumpsReturnReason(e.target.value)}
-                          placeholder="Reason for not returning pumps"
-                          className="w-full p-2 rounded bg-black border border-white/10 text-xs"
-                          rows={3}
-                        />
-                      )}
+                            {!status.returned && (
+                              <textarea
+                                value={status.reason}
+                                onChange={(e) =>
+                                  setPreviousPumpsStatus((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      returned: false,
+                                      reason: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="Reason for not returning this pump"
+                                className="w-full p-2 rounded bg-black border border-white/10 text-xs"
+                                rows={3}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

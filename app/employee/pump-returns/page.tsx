@@ -21,6 +21,7 @@ type ReturnOrder = {
   pumpNumbers?: string[];
   customerPreviousPumps?: string[];
   previousPumps?: string[];
+  previousPumpsStatus?: { pumpNumber: string; returned: boolean; reason?: string }[];
   previousPumpsReturned?: boolean | null;
   previousPumpsReturnReason?: string;
   driverName?: string;
@@ -64,7 +65,10 @@ export default function PumpReturnsPage() {
             id: d.id,
             ...(d.data() as any),
           }))
-          .filter((o) => (o.customerPreviousPumps || o.previousPumps || []).length > 0);
+          .filter((o) =>
+            (o.customerPreviousPumps || o.previousPumps || []).length > 0 ||
+            (o.previousPumpsStatus || []).length > 0
+          );
 
         setOrders(list);
       });
@@ -116,21 +120,32 @@ export default function PumpReturnsPage() {
 
               <div className="space-y-1">
                 <p className="text-xs text-white/60">Return status</p>
-                <p className="text-xs">
-                  {o.previousPumpsReturned === true && "Returned"}
-                  {o.previousPumpsReturned === false && "Not returned"}
-                  {o.previousPumpsReturned == null && "Pending"}
-                </p>
-              </div>
-
-              {o.previousPumpsReturned === false && (
-                <div className="space-y-1">
-                  <p className="text-xs text-white/60">Reason</p>
-                  <p className="text-xs text-white/80">
-                    {o.previousPumpsReturnReason || "—"}
+                {o.previousPumpsStatus && o.previousPumpsStatus.length > 0 ? (
+                  <div className="space-y-2">
+                    {o.previousPumpsStatus.map((entry) => (
+                      <div
+                        key={entry.pumpNumber}
+                        className="border border-white/10 rounded p-2"
+                      >
+                        <p className="text-xs">
+                          Pump #{entry.pumpNumber}: {entry.returned ? "Returned" : "Not returned"}
+                        </p>
+                        {!entry.returned && (
+                          <p className="text-xs text-white/80">
+                            Reason: {entry.reason || "—"}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs">
+                    {o.previousPumpsReturned === true && "Returned"}
+                    {o.previousPumpsReturned === false && "Not returned"}
+                    {o.previousPumpsReturned == null && "Pending"}
                   </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>
