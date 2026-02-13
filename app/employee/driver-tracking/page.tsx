@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
-import { Loader, MapPin } from "lucide-react";
+import { Loader, MapPin, Radio } from "lucide-react";
 
 /* ========================
    MAP COMPONENT (Dynamic)
@@ -33,52 +33,85 @@ export default function DriverTrackingPage() {
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     (async () => {
       await ensureAnonymousAuth();
-      if (pharmacyId) loadDrivers();
+      if (pharmacyId) {
+        setupRealtimeTracking();
+      }
     })();
-  }, []);
 
-  async function loadDrivers() {
+    return () => {
+      // Limpiar listeners cuando se desmonta el componente
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  }, [pharmacyId]);
+
+  function setupRealtimeTracking() {
     try {
       setLoading(true);
-      const ordersSnap = await getDocs(
-        query(
-          collection(db, "orders"),
-          where("pharmacyId", "==", pharmacyId),
-          where("status", "in", [
-            "ASSIGNED",
-            "IN_PROGRESS",
-            "ON_WAY_TO_PHARMACY",
-            "ON_WAY_TO_CUSTOMER",
-          ])
-        )
+      setIsLive(true);
+
+      // Configurar listener en tiempo real de Firestore
+      const q = query(
+        collection(db, "orders"),
+        where("pharmacyId", "==", pharmacyId),
+        where("status", "in", [
+          "ASSIGNED",
+          "IN_PROGRESS",
+          "ON_WAY_TO_PHARMACY",
+          "ON_WAY_TO_CUSTOMER",
+        ])
       );
 
-      const driverLocations = new (globalThis.Map)<string, Driver>();
+      unsubscribeRef.current = onSnapshot(
+        q,
+        (snapshot) => {
+          const driverLocations = new (globalThis.Map)<string, Driver>();
 
-      ordersSnap.docs.forEach((doc) => {
-        const order = doc.data();
-        if (order.driverId && order.driverName) {
-          if (!driverLocations.has(order.driverId)) {
-            driverLocations.set(order.driverId, {
-              id: order.driverId,
-              name: order.driverName,
-              status: order.status,
-              lastUpdate: order.statusUpdatedAt?.toMillis?.() || Date.now(),
-              lat: order.deliveredLatitude || 40.7128,
-              lng: order.deliveredLongitude || -74.006,
-            });
-          }
+          snapshot.docs.forEach((doc) => {
+            const order = doc.data();
+            if (order.driverId && order.driverName) {
+              if (!driverLocations.has(order.driverId)) {
+                driverLocations.set(order.driverId, {
+                  id: order.driverId,
+                  name: order.driverName,
+                  status: order.status,
+                  lastUpdate: order.statusUpdatedAt?.toMillis?.() || Date.now(),
+                  lat: order.deliveredLatitude || 40.7128,
+                  lng: order.deliveredLongitude || -74.006,
+                });
+              }
+            }
+          });
+
+          setDrivers(Array.from(driverLocations.values()));
+          setLoading(false);
+        },
+        (err) => {
+          console.error("Error en listener de Firestore:", err);
+          setIsLive(false);
+          setLoading(false);
         }
-      });
+      );
 
-      setDrivers(Array.from(driverLocations.values()));
+      // Intervalo de polling adicional cada 8 segundos para refrescar UI
+      updateIntervalRef.current = setInterval(() => {
+        // Trigger a re-render para actualizar timestamps y UI
+        setDrivers((prev) => [...prev]);
+      }, 8000);
     } catch (err) {
-      console.error("Error loading drivers:", err);
-    } finally {
+      console.error("Error al configurar tracking:", err);
+      setIsLive(false);
       setLoading(false);
     }
   }
@@ -98,18 +131,31 @@ export default function DriverTrackingPage() {
     }
   };
 
+  const getRelativeTime = (timestamp?: number) => {
+    if (!timestamp) return "Unknown";
+    const now = Date.now();
+    const diff = now - timestamp;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (seconds < 60) return `${seconds}s ago`;
+    if (minutes < 60) return `${minutes}m ago`;
+    return `${hours}h ago`;
+  };
+
   const statusLabel = (status?: string) => {
     switch (status) {
       case "ON_WAY_TO_CUSTOMER":
-        return "En ruta al cliente";
+        return "On way to customer";
       case "ON_WAY_TO_PHARMACY":
-        return "En ruta a farmacia";
+        return "On way to pharmacy";
       case "IN_PROGRESS":
-        return "En entrega";
+        return "In progress";
       case "ASSIGNED":
-        return "Asignado";
+        return "Assigned";
       default:
-        return "Desconocido";
+        return "Unknown";
     }
   };
 
@@ -117,13 +163,21 @@ export default function DriverTrackingPage() {
     <main className="min-h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* HEADER */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-            <MapPin className="text-emerald-400" size={28} />
-            Real-Time Driver Tracking
-          </h1>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <MapPin className="text-emerald-400" size={32} />
+              <h1 className="text-3xl font-bold text-white">Real-Time Driver Tracking</h1>
+              {isLive && (
+                <div className="flex items-center gap-1 bg-red-500/20 border border-red-500/40 rounded-full px-3 py-1 ml-auto">
+                  <Radio size={12} className="text-red-400 animate-pulse" />
+                  <span className="text-xs font-bold text-red-300 tracking-widest uppercase">LIVE</span>
+                </div>
+              )}
+            </div>
+          </div>
           <p className="text-sm text-slate-400">
-            Monitor active drivers and their deliveries in real-time
+            Monitoring {drivers.length} active driver{drivers.length !== 1 ? 's' : ''} • Updates every 8 seconds
           </p>
         </div>
 
@@ -131,9 +185,13 @@ export default function DriverTrackingPage() {
         <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-2xl border border-slate-700/50 p-6">
           {loading ? (
             <div className="h-96 flex items-center justify-center">
-              <div className="text-center">
-                <Loader className="animate-spin text-emerald-400 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">Loading map...</p>
+              <div className="text-center space-y-3">
+                <Loader className="animate-spin text-emerald-400 mx-auto mb-2" size={40} />
+                <p className="text-sm text-slate-400">Connecting to live tracking...</p>
+                <div className="flex items-center justify-center gap-1 text-xs text-emerald-400">
+                  <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  <span>Real-time updates active</span>
+                </div>
               </div>
             </div>
           ) : drivers.length > 0 ? (
@@ -147,7 +205,10 @@ export default function DriverTrackingPage() {
 
         {/* DRIVERS LIST */}
         <div className="space-y-3">
-          <h2 className="text-lg font-bold">Active Drivers ({drivers.length})</h2>
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            Active Drivers ({drivers.length})
+            {isLive && <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
+          </h2>
           {drivers.length === 0 ? (
             <div className="bg-slate-800/30 rounded-lg p-4 text-center text-slate-400 text-sm">
               No drivers currently active
@@ -163,18 +224,21 @@ export default function DriverTrackingPage() {
                     <p className="font-semibold text-white">{driver.name}</p>
                     <p className="text-xs text-slate-400">ID: {driver.id}</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     <div className={`flex items-center gap-2`}>
                       <div className={`w-3 h-3 rounded-full ${getStatusColor(driver.status)}`} />
                       <p className="text-sm text-slate-300">
                         {statusLabel(driver.status)}
                       </p>
                     </div>
-                    {driver.lastUpdate && (
-                      <p className="text-xs text-slate-500">
-                        {new Date(driver.lastUpdate).toLocaleTimeString("en-US")}
+                    <div className="text-right">
+                      <p className="text-xs text-emerald-400 font-semibold">
+                        {getRelativeTime(driver.lastUpdate)}
                       </p>
-                    )}
+                      <p className="text-xs text-slate-500">
+                        {driver.lastUpdate ? new Date(driver.lastUpdate).toLocaleTimeString("en-US") : "N/A"}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}
