@@ -299,6 +299,7 @@ export default function DriverDashboardPage() {
       driverId,
       driverName,
       assignedAt: serverTimestamp(),
+      statusUpdatedAt: serverTimestamp(),
     });
     loadOrders();
 
@@ -342,6 +343,7 @@ export default function DriverDashboardPage() {
   async function handleOnWayToPharmacy(id: string) {
     await updateDoc(doc(db, "orders", id), {
       status: "ON_WAY_TO_PHARMACY",
+      statusUpdatedAt: serverTimestamp(),
     });
     loadOrders();
   }
@@ -454,6 +456,7 @@ export default function DriverDashboardPage() {
       deliveredLongitude: location.lng,
       legalPdfUrl,
       status: "DELIVERED",
+      statusUpdatedAt: serverTimestamp(),
     });
 
     // Actualizar estado de bombas y registrar movimiento (DELIVERED)
@@ -669,7 +672,10 @@ export default function DriverDashboardPage() {
 
                     await updateDoc(
                       doc(db, "orders", selectedOrder.id),
-                      { status: "ON_WAY_TO_CUSTOMER" }
+                      {
+                        status: "ON_WAY_TO_CUSTOMER",
+                        statusUpdatedAt: serverTimestamp(),
+                      }
                     );
 
                     loadOrders();

@@ -15,6 +15,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  onSnapshot,
   query,
   where,
   serverTimestamp,
@@ -27,6 +28,7 @@ import { logPumpMovement } from "@/lib/pumpLogger";
 type Pump = {
   id: string;
   pumpNumber: string;
+  status?: string | null;
 };
 
 type Customer = {
@@ -49,13 +51,19 @@ type Order = {
   createdByEmployeeName: string;
   status: string;
   createdAt: any;
+  statusUpdatedAt?: any;
+  assignedAt?: any;
+  deliveredAt?: any;
+  deliveredAtISO?: string;
   driverName?: string;
 };
 
 /* ---------- Helpers ---------- */
 function formatDate(ts: any) {
-  if (!ts?.toDate) return "—";
-  return ts.toDate().toLocaleString("en-US");
+  if (!ts) return "—";
+  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
+  if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
+  return "—";
 }
 
 export default function EmployeeOrdersPage() {
@@ -99,6 +107,8 @@ export default function EmployeeOrdersPage() {
 
   /* ---------- Init ---------- */
   useEffect(() => {
+    let unsubscribe: null | (() => void) = null;
+
     (async () => {
       await ensureAnonymousAuth();
 
@@ -109,46 +119,36 @@ export default function EmployeeOrdersPage() {
 
       await loadPumps();
       await loadCustomers();
-      await loadOrders();
+      unsubscribe = subscribeOrders();
     })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   /* ---------- Loaders ---------- */
   async function loadPumps() {
-    // Try strict query first (only AVAILABLE)
-    let q = query(
+    if (!pharmacyId) return;
+
+    const q = query(
       collection(db, "pumps"),
       where("pharmacyId", "==", pharmacyId),
-      where("active", "==", true),
-      where("status", "==", "AVAILABLE")
+      where("active", "==", true)
     );
 
-    let snap = await getDocs(q);
+    const snap = await getDocs(q);
 
-    // Fallback 1: if none found, relax status filter (only active)
-    if (snap.empty) {
-      console.warn("No pumps found with status AVAILABLE, falling back to active=true");
-      q = query(
-        collection(db, "pumps"),
-        where("pharmacyId", "==", pharmacyId),
-        where("active", "==", true)
-      );
-      snap = await getDocs(q);
-    }
-
-    // Fallback 2: if still none, return any pumps for pharmacy
-    if (snap.empty) {
-      console.warn("No active pumps found, falling back to any pumps for pharmacy");
-      q = query(collection(db, "pumps"), where("pharmacyId", "==", pharmacyId));
-      snap = await getDocs(q);
-    }
-
-    const list = snap.docs.map((d) => ({
-      id: d.id,
-      pumpNumber: (d.data() as any).pumpNumber || String((d.data() as any).pump || ""),
-    }));
-
-    if (list.length === 0) console.info("loadPumps: no pumps returned for pharmacy", pharmacyId);
+    const list = snap.docs
+      .map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          pumpNumber: data.pumpNumber || String(data.pump || ""),
+          status: data.status ?? null,
+        } as Pump;
+      })
+      .filter((p) => !p.status || p.status === "AVAILABLE");
 
     setPumps(list);
   }
@@ -172,19 +172,22 @@ export default function EmployeeOrdersPage() {
     );
   }
 
-  async function loadOrders() {
+  function subscribeOrders() {
+    if (!pharmacyId) return () => {};
+
     const q = query(
       collection(db, "orders"),
       where("pharmacyId", "==", pharmacyId)
     );
 
-    const snap = await getDocs(q);
-    setOrders(
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      }))
-    );
+    return onSnapshot(q, (snap) => {
+      setOrders(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        }))
+      );
+    });
   }
 
   /* ---------- Create Order ---------- */
@@ -243,6 +246,7 @@ export default function EmployeeOrdersPage() {
         createdByEmployeeId: employeeId,
         status: "PENDING",
         createdAt: serverTimestamp(),
+        statusUpdatedAt: serverTimestamp(),
       };
 
       console.log("Creating order with payload:", orderPayload);
@@ -275,7 +279,6 @@ export default function EmployeeOrdersPage() {
       setInfo("Order created and set to PENDING — drivers will receive it.");
       setTimeout(() => setInfo(""), 6000);
 
-      await loadOrders();
     } catch (err: any) {
       console.error("handleCreateOrder error:", err);
       setError(
@@ -423,6 +426,22 @@ export default function EmployeeOrdersPage() {
                 <p className="text-xs text-white/60">
                   Driver: {o.driverName || "—"}
                 </p>
+
+                <p className="text-xs text-white/50">
+                  Last update: {formatDate(o.statusUpdatedAt || o.createdAt)}
+                </p>
+
+                {o.assignedAt && (
+                  <p className="text-xs text-white/50">
+                    Assigned: {formatDate(o.assignedAt)}
+                  </p>
+                )}
+
+                {(o.deliveredAt || o.deliveredAtISO) && (
+                  <p className="text-xs text-white/40">
+                    Delivered: {formatDate(o.deliveredAt || o.deliveredAtISO)}
+                  </p>
+                )}
 
                 <p className="text-xs text-white/40">
                   Created: {formatDate(o.createdAt)}
