@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, ensureAnonymousAuth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,6 +58,8 @@ export default function LoginPage() {
   const validatePin = async (overridePin?: string) => {
     const activePin = overridePin || pin;
     try {
+      await ensureAnonymousAuth();
+
       // 1️⃣ SUPER ADMIN
       if (activePin === "1844") {
         localStorage.setItem("NEXUS_ADMIN", "true");
