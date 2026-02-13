@@ -66,7 +66,30 @@ type Order = {
   createdAt: any;
   assignedAt?: any;
   startedAt?: any;
+  driverLatitude?: number;
+  driverLongitude?: number;
 };
+
+async function getDriverCurrentLocation(): Promise<{ lat: number; lng: number } | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        maximumAge: 0,
+      });
+    });
+
+    return {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /* ---------- Signature Canvas ---------- */
 function SignatureCanvas({
@@ -344,12 +367,20 @@ export default function DriverDashboardPage() {
   }
 
   async function handleAcceptOrder(id: string) {
+    const liveLocation = await getDriverCurrentLocation();
+
     await updateDoc(doc(db, "orders", id), {
       status: "ASSIGNED",
       driverId,
       driverName,
       assignedAt: serverTimestamp(),
       statusUpdatedAt: serverTimestamp(),
+      ...(liveLocation
+        ? {
+            driverLatitude: liveLocation.lat,
+            driverLongitude: liveLocation.lng,
+          }
+        : {}),
     });
     loadOrders();
 
@@ -401,9 +432,17 @@ export default function DriverDashboardPage() {
   }
 
   async function handleOnWayToPharmacy(id: string) {
+    const liveLocation = await getDriverCurrentLocation();
+
     await updateDoc(doc(db, "orders", id), {
       status: "ON_WAY_TO_PHARMACY",
       statusUpdatedAt: serverTimestamp(),
+      ...(liveLocation
+        ? {
+            driverLatitude: liveLocation.lat,
+            driverLongitude: liveLocation.lng,
+          }
+        : {}),
     });
     loadOrders();
   }
@@ -881,6 +920,8 @@ export default function DriverDashboardPage() {
                   setDriverPickupSignature("");
 
                   try {
+                    const liveLocation = await getDriverCurrentLocation();
+
                     await addDoc(collection(db, "pickupSignatures"), {
                       orderId: selectedOrder.id,
                       pharmacyId: selectedOrder.pharmacyId,
@@ -894,6 +935,12 @@ export default function DriverDashboardPage() {
                       {
                         status: "ON_WAY_TO_CUSTOMER",
                         statusUpdatedAt: serverTimestamp(),
+                        ...(liveLocation
+                          ? {
+                              driverLatitude: liveLocation.lat,
+                              driverLongitude: liveLocation.lng,
+                            }
+                          : {}),
                       }
                     );
 

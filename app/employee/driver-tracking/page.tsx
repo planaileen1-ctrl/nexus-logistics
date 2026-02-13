@@ -82,13 +82,27 @@ export default function DriverTrackingPage() {
             const order = doc.data();
             if (order.driverId && order.driverName) {
               if (!driverLocations.has(order.driverId)) {
+                const latCandidate =
+                  typeof order.driverLatitude === "number"
+                    ? order.driverLatitude
+                    : typeof order.deliveredLatitude === "number"
+                    ? order.deliveredLatitude
+                    : undefined;
+
+                const lngCandidate =
+                  typeof order.driverLongitude === "number"
+                    ? order.driverLongitude
+                    : typeof order.deliveredLongitude === "number"
+                    ? order.deliveredLongitude
+                    : undefined;
+
                 driverLocations.set(order.driverId, {
                   id: order.driverId,
                   name: order.driverName,
                   status: order.status,
                   lastUpdate: order.statusUpdatedAt?.toMillis?.() || Date.now(),
-                  lat: order.deliveredLatitude || 40.7128,
-                  lng: order.deliveredLongitude || -74.006,
+                  lat: latCandidate,
+                  lng: lngCandidate,
                 });
               }
             }

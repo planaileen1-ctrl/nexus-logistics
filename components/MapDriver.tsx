@@ -22,6 +22,8 @@ type Driver = {
 };
 
 const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
+  const ECUADOR_CENTER: [number, number] = [-1.8312, -78.1834];
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
@@ -72,7 +74,7 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
         if (!L || cancelled || !containerRef.current) return;
 
         if (!mapRef.current) {
-          mapRef.current = L.map(containerRef.current).setView([39.8283, -98.5795], 4);
+          mapRef.current = L.map(containerRef.current).setView(ECUADOR_CENTER, 6);
 
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: "© OpenStreetMap contributors",
@@ -122,7 +124,7 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
           const bounds = L.latLngBounds(driversWithLocation.map((d) => [d.lat!, d.lng!]));
           mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
         } else {
-          mapRef.current.setView([39.8283, -98.5795], 4);
+          mapRef.current.setView(ECUADOR_CENTER, 6);
         }
 
         setTimeout(() => {
