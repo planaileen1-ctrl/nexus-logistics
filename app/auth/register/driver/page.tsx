@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import SignaturePad from "@/components/SignaturePad";
+import { sendAppEmail } from "@/lib/emailClient";
 
 const COUNTRIES = {
   ECUADOR: [
@@ -93,6 +94,20 @@ export default function RegisterDriverPage() {
         pin,
         active: true,
         createdAt: serverTimestamp(),
+      });
+
+      const sentAt = new Date().toLocaleString("en-US");
+      await sendAppEmail({
+        to: email,
+        subject: "Your Driver Login PIN",
+        html: `
+          <p>Hello ${fullName},</p>
+          <p>Your driver account has been created.</p>
+          <p><strong>Login PIN:</strong> ${pin}</p>
+          <p><strong>Created:</strong> ${sentAt}</p>
+          <p>Please keep this PIN secure.</p>
+        `,
+        text: `Your driver login PIN: ${pin}. Created: ${sentAt}.`,
       });
 
       setDriverId(ref.id);

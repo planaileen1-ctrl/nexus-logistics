@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
+import { sendAppEmail } from "@/lib/emailClient";
 
 const COUNTRIES = {
   ECUADOR: [
@@ -100,6 +101,20 @@ export default function RegisterPharmacyPage() {
         pin,
         active: true,
         createdAt: serverTimestamp(),
+      });
+
+      const sentAt = new Date().toLocaleString("en-US");
+      await sendAppEmail({
+        to: form.email,
+        subject: "Your Pharmacy Access PIN",
+        html: `
+          <p>Hello ${form.pharmacyName || ""},</p>
+          <p>Your pharmacy registration is complete.</p>
+          <p><strong>Access PIN:</strong> ${pin}</p>
+          <p><strong>Registered:</strong> ${sentAt}</p>
+          <p>Please keep this PIN secure.</p>
+        `,
+        text: `Your pharmacy access PIN: ${pin}. Registered: ${sentAt}.`,
       });
 
       setGeneratedPin(pin);

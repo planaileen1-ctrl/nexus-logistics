@@ -25,8 +25,9 @@ export default function AdminLoginPage() {
   /* =====================
      VALIDATE ADMIN PIN
   ===================== */
-  const validatePin = () => {
-    if (pin === "1844") {
+  const validatePin = (overridePin?: string) => {
+    const activePin = overridePin || pin;
+    if (activePin === "1844") {
       localStorage.setItem("NEXUS_ADMIN", "true");
       router.replace("/admin");
     } else {
@@ -53,7 +54,11 @@ export default function AdminLoginPage() {
     }
 
     if (pin.length < 4) {
-      setPin((p) => p + String(v));
+      const next = pin + String(v);
+      setPin(next);
+      if (next.length === 4) {
+        validatePin(next);
+      }
     }
   };
 

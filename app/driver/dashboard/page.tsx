@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   collection,
   getDocs,
+  getDoc,
   addDoc,
   query,
   where,
@@ -23,6 +24,7 @@ import {
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
+import { sendAppEmail } from "@/lib/emailClient";
 import DeliverySignature from "@/components/DeliverySignature";
 import { uploadSignatureToStorage } from "@/lib/uploadSignature";
 import { generateSHA256Hash } from "@/lib/hashSignature";
@@ -44,6 +46,7 @@ type Order = {
   id: string;
   pharmacyId: string;
   pharmacyName: string;
+  customerId?: string;
   pumpNumbers: string[];
   customerName: string;
   customerCity?: string;
@@ -433,6 +436,10 @@ export default function DriverDashboardPage() {
       };
     });
 
+    const notReturnedList = previousPumpsStatusList.filter(
+      (entry) => !entry.returned
+    );
+
     const previousPumpsReturnToPharmacy = previousPumpsStatusList
       .filter((entry) => entry.returned)
       .map((entry) => ({
@@ -573,6 +580,42 @@ export default function DriverDashboardPage() {
         status: "DELIVERED",
         statusUpdatedAt: serverTimestamp(),
       });
+
+      if (notReturnedList.length > 0 && selectedOrder.customerId) {
+        try {
+          const customerSnap = await getDoc(
+            doc(db, "customers", selectedOrder.customerId)
+          );
+          const customerEmail = customerSnap.data()?.email as string | undefined;
+
+          if (customerEmail) {
+            const sentAt = new Date().toLocaleString("en-US");
+            const reasonsHtml = notReturnedList
+              .map(
+                (entry) =>
+                  `<li>Pump #${entry.pumpNumber}: ${entry.reason || "No reason provided"}</li>`
+              )
+              .join("");
+
+            await sendAppEmail({
+              to: customerEmail,
+              subject: "Pumps Not Returned",
+              html: `
+                <p>Hello ${selectedOrder.customerName},</p>
+                <p>We did not receive the following pumps during the last delivery:</p>
+                <ul>${reasonsHtml}</ul>
+                <p><strong>Recorded:</strong> ${sentAt}</p>
+                <p>Please return these pumps on the next delivery.</p>
+              `,
+              text: `Pumps not returned: ${notReturnedList
+                .map((entry) => `${entry.pumpNumber} (${entry.reason || "No reason"})`)
+                .join(", ")}. Recorded: ${sentAt}. Please return these pumps on the next delivery.`,
+            });
+          }
+        } catch (err) {
+          console.warn("Customer email send failed:", err);
+        }
+      }
 
     // Actualizar estado de bombas y registrar movimiento (DELIVERED)
     for (const pumpNumber of selectedOrder!.pumpNumbers) {

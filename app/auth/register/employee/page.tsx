@@ -15,6 +15,7 @@ import {
   findPharmacyByPin,
   registerEmployee,
 } from "@/lib/employees";
+import { sendAppEmail } from "@/lib/emailClient";
 
 import SignaturePad from "@/components/SignaturePad";
 import { saveEmployeeSignature } from "@/lib/signatures";
@@ -79,6 +80,21 @@ const [savingSignature, setSavingSignature] = useState(false);
         pharmacy,
         jobTitle // ✅ PASAMOS EL CARGO
       );
+
+      const sentAt = new Date().toLocaleString("en-US");
+      await sendAppEmail({
+        to: email,
+        subject: "Your Employee Login PIN",
+        html: `
+          <p>Hello ${fullName},</p>
+          <p>Your employee account has been created.</p>
+          <p><strong>Login PIN:</strong> ${result.pin}</p>
+          <p><strong>Pharmacy:</strong> ${pharmacy?.pharmacyName || ""}</p>
+          <p><strong>Created:</strong> ${sentAt}</p>
+          <p>Please keep this PIN secure.</p>
+        `,
+        text: `Your employee login PIN: ${result.pin}. Pharmacy: ${pharmacy?.pharmacyName || ""}. Created: ${sentAt}.`,
+      });
 
       setEmployeeId(result.employeeId);
       setEmployeePin(result.pin);

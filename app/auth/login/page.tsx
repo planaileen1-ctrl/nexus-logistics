@@ -43,7 +43,11 @@ export default function LoginPage() {
     }
 
     if (pin.length < 4) {
-      setPin((prev) => prev + value);
+      const next = pin + value;
+      setPin(next);
+      if (next.length === 4) {
+        validatePin(next);
+      }
     }
   };
 
@@ -51,10 +55,11 @@ export default function LoginPage() {
      VALIDATE PIN
   ===================== */
 
-  const validatePin = async () => {
+  const validatePin = async (overridePin?: string) => {
+    const activePin = overridePin || pin;
     try {
       // 1️⃣ SUPER ADMIN
-      if (pin === "1844") {
+      if (activePin === "1844") {
         localStorage.setItem("NEXUS_ADMIN", "true");
         router.replace("/admin");
         return;
@@ -63,7 +68,7 @@ export default function LoginPage() {
       // 2️⃣ PHARMACY
       const pharmacyQuery = query(
         collection(db, "pharmacies"),
-        where("pin", "==", pin),
+        where("pin", "==", activePin),
         where("active", "==", true)
       );
 
@@ -87,7 +92,7 @@ export default function LoginPage() {
       // 3️⃣ EMPLOYEE  ✅ BLINDED HERE
       const employeeQuery = query(
         collection(db, "employees"),
-        where("pin", "==", pin),
+        where("pin", "==", activePin),
         where("active", "==", true)
       );
 
@@ -116,7 +121,7 @@ export default function LoginPage() {
       // 4️⃣ DRIVER
       const driverQuery = query(
         collection(db, "drivers"),
-        where("pin", "==", pin),
+        where("pin", "==", activePin),
         where("active", "==", true)
       );
 

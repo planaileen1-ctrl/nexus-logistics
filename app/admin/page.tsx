@@ -21,6 +21,7 @@ import {
   cancelLicense,
   deleteLicense,
 } from "@/lib/licenses";
+import { sendAppEmail } from "@/lib/emailClient";
 
 type License = {
   id: string;
@@ -50,6 +51,20 @@ export default function AdminPage() {
     setLoading(true);
 
     const result = await createLicense(email);
+
+    const sentAt = new Date().toLocaleString("en-US");
+    await sendAppEmail({
+      to: email,
+      subject: "Your Nexus License Code",
+      html: `
+        <p>Hello,</p>
+        <p>Your Nexus license code has been created.</p>
+        <p><strong>License Code:</strong> ${result.code}</p>
+        <p><strong>Created:</strong> ${sentAt}</p>
+        <p>Please keep this code secure.</p>
+      `,
+      text: `Your Nexus license code: ${result.code}. Created: ${sentAt}.`,
+    });
 
     setLicenses((prev) => [
       {
