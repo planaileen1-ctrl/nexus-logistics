@@ -967,7 +967,7 @@ export default function DriverDashboardPage() {
               <button
                 disabled={!employeeSignature || !driverPickupSignature}
                 onClick={async () => {
-                  // 🔑 CERRAR UI PRIMERO (CLAVE)
+                  // 🔑 CLOSE UI FIRST (CRITICAL)
                   setShowPickupModal(false);
                   setEmployeeSignature("");
                   setDriverPickupSignature("");

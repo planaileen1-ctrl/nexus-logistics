@@ -10,10 +10,61 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function EmployeeDashboardPage() {
   const router = useRouter();
+  const [employeeName, setEmployeeName] = useState("");
+  const [employeeEmail, setEmployeeEmail] = useState("");
+  const [loginAt, setLoginAt] = useState("");
+
+  useEffect(() => {
+    const name = localStorage.getItem("EMPLOYEE_NAME") || "Unknown Employee";
+    const email = localStorage.getItem("EMPLOYEE_EMAIL") || "";
+    const savedLoginAt = localStorage.getItem("EMPLOYEE_LOGIN_AT");
+
+    if (!savedLoginAt) {
+      const now = new Date().toISOString();
+      localStorage.setItem("EMPLOYEE_LOGIN_AT", now);
+      setLoginAt(now);
+    } else {
+      setLoginAt(savedLoginAt);
+    }
+
+    setEmployeeName(name);
+    setEmployeeEmail(email);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Firebase sign out failed:", error);
+    }
+
+    localStorage.removeItem("EMPLOYEE_ID");
+    localStorage.removeItem("EMPLOYEE_NAME");
+    localStorage.removeItem("EMPLOYEE_EMAIL");
+    localStorage.removeItem("EMPLOYEE_ROLE");
+    localStorage.removeItem("EMPLOYEE_LOGIN_AT");
+    localStorage.removeItem("PHARMACY_ID");
+    localStorage.removeItem("PHARMACY_NAME");
+    localStorage.removeItem("PHARMACY_CITY");
+    localStorage.removeItem("PHARMACY_STATE");
+    localStorage.removeItem("PHARMACY_COUNTRY");
+
+    router.replace("/auth/login");
+  };
+
+  const formattedLoginAt = loginAt
+    ? new Date(loginAt).toLocaleString("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "--";
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white px-4 py-8 overflow-hidden">
@@ -32,6 +83,30 @@ export default function EmployeeDashboardPage() {
           <p className="text-sm text-slate-400 font-medium">
             Select an action to continue managing operations
           </p>
+        </div>
+
+        <div className="bg-gradient-to-r from-slate-900/70 to-slate-800/40 border border-slate-700/60 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-widest text-emerald-300/90 font-semibold">
+              Session
+            </p>
+            <p className="text-sm text-slate-100 font-semibold">
+              {employeeName}
+            </p>
+            {employeeEmail && (
+              <p className="text-xs text-slate-400">{employeeEmail}</p>
+            )}
+            <p className="text-xs text-slate-400">
+              Login: <span className="text-slate-200">{formattedLoginAt}</span>
+            </p>
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/40 hover:border-rose-300/70 text-rose-200 text-xs md:text-sm font-semibold uppercase tracking-wide px-4 py-2 rounded-xl transition-colors"
+          >
+            Sign Out
+          </button>
         </div>
 
         {/* CARDS GRID */}

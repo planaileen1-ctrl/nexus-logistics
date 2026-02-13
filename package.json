@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "cleanup:drivers:dry": "node scripts/remove-driver-vehicle-fields.js --dryRun",
+    "cleanup:drivers": "node scripts/remove-driver-vehicle-fields.js"
   },
   "dependencies": {
     "firebase": "^12.9.0",

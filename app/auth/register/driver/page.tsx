@@ -50,9 +50,6 @@ export default function RegisterDriverPage() {
   const [country, setCountry] = useState<CountryKey | "">("");
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
-  const [plate, setPlate] = useState("");
-
-  const [vehiclePhotoBase64, setVehiclePhotoBase64] = useState<string | null>(null);
   const [driverPin, setDriverPin] = useState<string | null>(null);
   const [driverId, setDriverId] = useState<string | null>(null);
   const [signatureSaved, setSignatureSaved] = useState(false);
@@ -65,17 +62,6 @@ export default function RegisterDriverPage() {
   useEffect(() => {
     ensureAnonymousAuth();
   }, []);
-
-  function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setVehiclePhotoBase64(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  }
 
   async function handleRegister() {
     setError(null);
@@ -92,8 +78,6 @@ export default function RegisterDriverPage() {
         country,
         state,
         city,
-        plate: plate.toUpperCase(),
-        vehiclePhotoBase64,
         pin,
         active: true,
         createdAt: serverTimestamp(),
@@ -247,33 +231,6 @@ export default function RegisterDriverPage() {
           onChange={(e) => setCity(e.target.value)}
           className="w-full px-4 py-2 rounded bg-slate-800 border border-slate-700"
         />
-
-        <input
-          placeholder="Vehicle Plate"
-          value={plate}
-          onChange={(e) => setPlate(e.target.value)}
-          className="w-full px-4 py-2 rounded bg-slate-800 border border-slate-700"
-        />
-
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handlePhotoUpload}
-          className="w-full text-sm"
-        />
-
-        {/* ✅ VEHICLE IMAGE PREVIEW */}
-        {vehiclePhotoBase64 && (
-          <div>
-            <p className="text-xs text-white/60 mb-1">Vehicle Photo Preview</p>
-            <img
-              src={vehiclePhotoBase64}
-              alt="Vehicle"
-              className="w-full h-40 object-contain rounded border border-white/10 bg-black"
-            />
-          </div>
-        )}
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 

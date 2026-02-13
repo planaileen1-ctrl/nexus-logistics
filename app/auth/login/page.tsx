@@ -113,6 +113,7 @@ export default function LoginPage() {
         localStorage.setItem("PHARMACY_CITY", employee.city || "");
         localStorage.setItem("PHARMACY_STATE", employee.state || "");
         localStorage.setItem("PHARMACY_COUNTRY", employee.country || "");
+        localStorage.setItem("EMPLOYEE_LOGIN_AT", new Date().toISOString());
 
         router.replace("/employee/dashboard");
         return;

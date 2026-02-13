@@ -204,10 +204,10 @@ export default function EmployeeOrdersPage() {
       await ensureAnonymousAuth();
 
       /**
-       * 🔒 BLOQUEO ABSOLUTO DE PUMPS OCUPADOS
-       * - Busca en Firestore
-       * - Cualquier pedido NO ENTREGADO
-       * - Sin importar cliente, empleado o conductor
+       * 🔒 ABSOLUTE LOCK FOR OCCUPIED PUMPS
+       * - Checks Firestore
+       * - Any order NOT DELIVERED
+       * - Regardless of customer, employee, or driver
        */
       const q = query(
         collection(db, "orders"),
