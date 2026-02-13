@@ -31,10 +31,21 @@ type Customer = {
 
 type Order = {
   id: string;
-  customerId: string;
-  customerName: string;
-  pumpNumbers: string[];
+  customerId?: string;
+  customerName?: string;
+  statusUpdatedAt?: any;
+  previousPumpsReturnToPharmacy?: {
+    pumpNumber: string;
+    returnedToPharmacy: boolean;
+  }[];
 };
+
+function toMs(ts: any) {
+  if (!ts) return 0;
+  if (typeof ts === "string") return new Date(ts).getTime();
+  if (ts?.toDate) return ts.toDate().getTime();
+  return 0;
+}
 
 export default function PumpsManagerPage() {
   const router = useRouter();
@@ -113,13 +124,20 @@ export default function PumpsManagerPage() {
 
   const customerPumps = customers.map((c) => {
     const pumpSet = new Set<string>();
-    orders
+    const sortedOrders = [...orders]
       .filter((o) => o.customerId === c.id)
-      .forEach((o) => {
-        (o.pumpNumbers || []).forEach((num) => {
-          if (num) pumpSet.add(String(num));
+      .sort((a, b) => toMs(b.statusUpdatedAt) - toMs(a.statusUpdatedAt));
+
+    sortedOrders.forEach((o) => {
+      (o.previousPumpsReturnToPharmacy || [])
+        .filter((entry) => entry.returnedToPharmacy)
+        .forEach((entry) => {
+          const number = String(entry.pumpNumber || "").trim();
+          if (number && !pumpSet.has(number)) {
+            pumpSet.add(number);
+          }
         });
-      });
+    });
 
     return {
       ...c,
@@ -180,9 +198,9 @@ export default function PumpsManagerPage() {
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
       <div className="w-full max-w-4xl space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Pumps Manager</h1>
+          <h1 className="text-3xl font-bold">Return Reminders</h1>
           <p className="text-sm text-white/60">
-            Track customer pumps and send return reminders
+            Track confirmed returned pumps and send reminder notes
           </p>
         </div>
 
@@ -203,14 +221,16 @@ export default function PumpsManagerPage() {
                   )}
                 </div>
                 <div className="text-xs text-white/40">
-                  Based on order history
+                  Based on confirmed returns
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-semibold">Known Pumps</p>
+                <p className="text-sm font-semibold">Returned Pumps</p>
                 {c.pumps.length === 0 && (
-                  <p className="text-xs text-white/60">No pumps found.</p>
+                  <p className="text-xs text-white/60">
+                    No returned pumps yet. Confirm returns in Pump Returns first.
+                  </p>
                 )}
                 {c.pumps.length > 0 && (
                   <div className="flex flex-wrap gap-2">

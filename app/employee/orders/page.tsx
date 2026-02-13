@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import {
   collection,
   addDoc,
+  getDoc,
   getDocs,
   onSnapshot,
   query,
@@ -72,6 +73,13 @@ function formatDate(ts: any) {
   return "—";
 }
 
+function getEffectiveOrderStatus(order: Order) {
+  const rawStatus = String(order.status || "").trim().toUpperCase();
+  if (rawStatus === "DELIVERED") return "DELIVERED";
+  if (order.deliveredAt || order.deliveredAtISO) return "DELIVERED";
+  return rawStatus || "PENDING";
+}
+
 export default function EmployeeOrdersPage() {
   const router = useRouter();
 
@@ -108,7 +116,7 @@ export default function EmployeeOrdersPage() {
   const [customerId, setCustomerId] = useState("");
   const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
   const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
-  const [showDriverActivity, setShowDriverActivity] = useState(false);
+  const [showOrdersActivity, setShowOrdersActivity] = useState(false);
   const [orderSearch, setOrderSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -143,9 +151,9 @@ export default function EmployeeOrdersPage() {
 
     const view = new URLSearchParams(window.location.search).get("view");
     if (view === "activity") {
-      setShowDriverActivity(true);
+      setShowOrdersActivity(true);
     } else if (view === "orders") {
-      setShowDriverActivity(false);
+      setShowOrdersActivity(false);
     }
   }, []);
 
@@ -281,13 +289,53 @@ export default function EmployeeOrdersPage() {
 
       const snap = await getDocs(q);
 
-      const conflict = snap.docs.find(
-        (d) => d.data().status && d.data().status !== "DELIVERED"
-      );
+      const conflict = snap.docs.find((d) => {
+        const data = d.data() as any;
+        const rawStatus = String(data.status || "").trim().toUpperCase();
+        const effectiveStatus =
+          rawStatus === "DELIVERED" || data.deliveredAt || data.deliveredAtISO
+            ? "DELIVERED"
+            : rawStatus || "PENDING";
+
+        return effectiveStatus !== "DELIVERED";
+      });
 
       if (conflict) {
         setError(
           "One or more selected pumps are already assigned to an active order."
+        );
+        await loadPumps();
+        setLoading(false);
+        return;
+      }
+
+      const selectedPumpDocs = await Promise.all(
+        pumpIds.map((pumpId) => getDoc(doc(db, "pumps", pumpId)))
+      );
+
+      const unavailablePumpNumbers: string[] = [];
+
+      selectedPumpDocs.forEach((pumpDoc, index) => {
+        const pumpData = (pumpDoc.data() || {}) as any;
+        const status = String(pumpData.status || "AVAILABLE").trim().toUpperCase();
+        const maintenanceDue = pumpData.maintenanceDue === true;
+        const active = pumpData.active !== false;
+
+        if (!pumpDoc.exists() || !active || maintenanceDue || status !== "AVAILABLE") {
+          unavailablePumpNumbers.push(pumpNumbers[index]);
+        }
+      });
+
+      if (unavailablePumpNumbers.length > 0) {
+        setError(
+          `These pumps are no longer available: ${unavailablePumpNumbers.join(", ")}. Refreshing list...`
+        );
+        await loadPumps();
+        setPumpIds((prev) =>
+          prev.filter((_, idx) => !unavailablePumpNumbers.includes(pumpNumbers[idx]))
+        );
+        setPumpNumbers((prev) =>
+          prev.filter((num) => !unavailablePumpNumbers.includes(num))
         );
         setLoading(false);
         return;
@@ -349,6 +397,7 @@ export default function EmployeeOrdersPage() {
       setPumpNumbers([]);
       setPumpSearch("");
       setCustomerId("");
+      await loadPumps();
 
       if (pumpUpdateFailures.length > 0) {
         setInfo(
@@ -454,7 +503,8 @@ export default function EmployeeOrdersPage() {
     return customerMatch || pumpMatch;
   });
 
-  const latestFiveOrders = [...filteredOrders]
+  const activeOrders = [...filteredOrders]
+    .filter((o) => getEffectiveOrderStatus(o) !== "DELIVERED")
     .sort((a, b) => {
       const toMs = (ts: any) => {
         if (!ts) return 0;
@@ -464,8 +514,7 @@ export default function EmployeeOrdersPage() {
       };
 
       return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
-    })
-    .slice(0, 5);
+    });
 
   /* ---------- UI ---------- */
   return (
@@ -646,10 +695,29 @@ export default function EmployeeOrdersPage() {
           </button>
         </div>
 
+        {/* ORDERS ACTIVITY */}
+        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">Orders Activity</h2>
+              <p className="text-xs text-white/60">
+                Live updates from registered orders
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowOrdersActivity(true)}
+              className="text-xs px-3 py-2 rounded bg-white/10 hover:bg-white/20"
+            >
+              View Activity
+            </button>
+          </div>
+        </div>
+
         {/* ORDERS LIST */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6">
           <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="font-semibold">Latest 5 Orders</h2>
+            <h2 className="font-semibold">New Orders</h2>
             <div className="relative w-full md:max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
                 <svg
@@ -675,12 +743,21 @@ export default function EmployeeOrdersPage() {
             </div>
           </div>
 
+          {activeOrders.length === 0 && (
+            <p className="text-xs text-white/60">No active orders yet.</p>
+          )}
+
           <ul className="space-y-3">
-            {latestFiveOrders.map((o) => (
+            {activeOrders.map((o) => (
               <li
                 key={o.id}
                 className="border border-white/10 rounded p-4 space-y-1"
               >
+                {(() => {
+                  const effectiveStatus = getEffectiveOrderStatus(o);
+
+                  return (
+                    <>
                 <p className="font-medium">
                   Pumps: {o.pumpNumbers?.join(", ")} → {o.customerName}
                 </p>
@@ -689,12 +766,12 @@ export default function EmployeeOrdersPage() {
                   Status:{" "}
                   <span
                     className={
-                      o.status === "DELIVERED"
+                      effectiveStatus === "DELIVERED"
                         ? "text-green-400"
                         : "text-yellow-400"
                     }
                   >
-                    {o.status}
+                    {effectiveStatus}
                   </span>
                 </p>
 
@@ -721,20 +798,23 @@ export default function EmployeeOrdersPage() {
                 <p className="text-xs text-white/40">
                   Created: {formatDate(o.createdAt)}
                 </p>
+                    </>
+                  );
+                })()}
               </li>
             ))}
           </ul>
         </div>
 
         {/* DRIVER ACTIVITY MODAL */}
-        {showDriverActivity && (
+        {showOrdersActivity && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center px-4">
             <div className="bg-[#020617] w-full max-w-3xl rounded-xl p-6 space-y-4 border border-white/10">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Live Driver Activity</h3>
+                <h3 className="font-semibold">Orders Activity</h3>
                 <button
                   type="button"
-                  onClick={() => setShowDriverActivity(false)}
+                  onClick={() => setShowOrdersActivity(false)}
                   className="text-xs text-white/60 hover:text-white"
                 >
                   Close
@@ -751,6 +831,11 @@ export default function EmployeeOrdersPage() {
                     key={o.id}
                     className="border border-white/10 rounded p-4 space-y-1"
                   >
+                    {(() => {
+                      const effectiveStatus = getEffectiveOrderStatus(o);
+
+                      return (
+                        <>
                     <p className="text-sm font-semibold">
                       {o.customerName} — Pumps: {o.pumpNumbers?.join(", ")}
                     </p>
@@ -758,11 +843,23 @@ export default function EmployeeOrdersPage() {
                       Driver: {o.driverName || "Unassigned"}
                     </p>
                     <p className="text-xs">
-                      Status: <span className="text-yellow-400">{o.status}</span>
+                      Status:{" "}
+                      <span
+                        className={
+                          effectiveStatus === "DELIVERED"
+                            ? "text-green-400"
+                            : "text-yellow-400"
+                        }
+                      >
+                        {effectiveStatus}
+                      </span>
                     </p>
                     <p className="text-xs text-white/50">
                       Last update: {formatDate(o.statusUpdatedAt || o.createdAt)}
                     </p>
+                        </>
+                      );
+                    })()}
                   </li>
                 ))}
               </ul>

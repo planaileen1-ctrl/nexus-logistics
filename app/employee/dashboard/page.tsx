@@ -85,7 +85,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </button>
 
-          {/* PUMPS MANAGER */}
+          {/* RETURN REMINDERS */}
           <button
             onClick={() => router.push("/employee/pumps-manager")}
             className="group cursor-pointer bg-gradient-to-br from-blue-500/15 to-blue-600/5 border border-blue-500/40 hover:border-blue-400/80
@@ -94,10 +94,10 @@ export default function EmployeeDashboardPage() {
             <div className="space-y-4">
               <div className="text-blue-300 text-4xl group-hover:scale-110 transition-transform">🧪</div>
               <div className="space-y-2">
-                <h2 className="text-lg font-bold group-hover:text-blue-100 transition">Pumps Manager</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Track which customers have pumps and send return reminders.</p>
+                <h2 className="text-lg font-bold group-hover:text-blue-100 transition">Return Reminders</h2>
+                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Review returned pumps and manage reminder notes by customer.</p>
               </div>
-              <p className="text-xs text-blue-400 font-semibold">Open pumps manager →</p>
+              <p className="text-xs text-blue-400 font-semibold">Open reminders →</p>
             </div>
           </button>
 
