@@ -12,7 +12,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   collection,
   addDoc,
@@ -64,7 +64,6 @@ type ActivityOrder = {
 /* ---------- Helpers ---------- */
 export default function EmployeeOrdersPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   /* ---------- Context ---------- */
   const pharmacyId =
@@ -106,8 +105,23 @@ export default function EmployeeOrdersPage() {
   const [activityOrders, setActivityOrders] = useState<ActivityOrder[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityStatusFilter, setActivityStatusFilter] = useState<"ALL" | "ACTIVE" | "DELIVERED">("ALL");
+  const [currentView, setCurrentView] = useState<"activity" | "create">("create");
 
-  const currentView = searchParams.get("view") === "activity" ? "activity" : "create";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncViewFromUrl = () => {
+      const view = new URLSearchParams(window.location.search).get("view");
+      setCurrentView(view === "activity" ? "activity" : "create");
+    };
+
+    syncViewFromUrl();
+    window.addEventListener("popstate", syncViewFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncViewFromUrl);
+    };
+  }, []);
 
   /* ---------- Init ---------- */
   useEffect(() => {
@@ -564,7 +578,10 @@ export default function EmployeeOrdersPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => router.replace("/employee/orders?view=create")}
+            onClick={() => {
+              setCurrentView("create");
+              router.replace("/employee/orders?view=create");
+            }}
             className={`rounded-lg py-2 text-sm font-semibold border transition-colors ${
               currentView === "create"
                 ? "bg-indigo-600 border-indigo-500 text-white"
@@ -575,7 +592,10 @@ export default function EmployeeOrdersPage() {
           </button>
           <button
             type="button"
-            onClick={() => router.replace("/employee/orders?view=activity")}
+            onClick={() => {
+              setCurrentView("activity");
+              router.replace("/employee/orders?view=activity");
+            }}
             className={`rounded-lg py-2 text-sm font-semibold border transition-colors ${
               currentView === "activity"
                 ? "bg-cyan-600 border-cyan-500 text-white"
