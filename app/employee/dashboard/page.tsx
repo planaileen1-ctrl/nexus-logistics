@@ -165,6 +165,22 @@ export default function EmployeeDashboardPage() {
             </div>
           </button>
 
+          {/* DELIVERY PDF BACKUPS */}
+          <button
+            onClick={() => router.push("/employee/delivery-pdfs")}
+            className="group cursor-pointer bg-gradient-to-br from-cyan-500/15 to-cyan-600/5 border border-cyan-500/40 hover:border-cyan-400/80
+                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-cyan-500/20"
+          >
+            <div className="space-y-4">
+              <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">📄</div>
+              <div className="space-y-2">
+                <h2 className="text-lg font-bold group-hover:text-cyan-100 transition">Delivery PDF Backups</h2>
+                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Open legal delivery PDFs and share them by email.</p>
+              </div>
+              <p className="text-xs text-cyan-400 font-semibold">Open PDF backups →</p>
+            </div>
+          </button>
+
           {/* DRIVER TRACKING */}
           <button
             onClick={() => router.push("/employee/driver-tracking")}

@@ -18,7 +18,6 @@ import {
   addDoc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   where,
   serverTimestamp,
@@ -27,7 +26,6 @@ import { updateDoc, doc } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
 import { normalizePumpScannerInput } from "@/lib/pumpScanner";
-import { sendAppEmail } from "@/lib/emailClient";
 
 /* ---------- Types ---------- */
 type Pump = {
@@ -47,26 +45,7 @@ type Customer = {
   returnReminderNote?: string;
 };
 
-type DeliveryBackup = {
-  id: string;
-  customerName?: string;
-  driverName?: string;
-  deliveredAt?: any;
-  deliveredAtISO?: string;
-  statusUpdatedAt?: any;
-  createdAt?: any;
-  legalPdfUrl?: string;
-  status?: string;
-};
-
 /* ---------- Helpers ---------- */
-function formatDate(ts: any) {
-  if (!ts) return "—";
-  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
-  if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
-  return "—";
-}
-
 export default function EmployeeOrdersPage() {
   const router = useRouter();
 
@@ -94,7 +73,6 @@ export default function EmployeeOrdersPage() {
   /* ---------- State ---------- */
   const [pumps, setPumps] = useState<Pump[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [deliveryBackups, setDeliveryBackups] = useState<DeliveryBackup[]>([]);
 
   const [pumpIds, setPumpIds] = useState<string[]>([]);
   const [pumpNumbers, setPumpNumbers] = useState<string[]>([]);
@@ -103,8 +81,6 @@ export default function EmployeeOrdersPage() {
   const [customerId, setCustomerId] = useState("");
   const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
   const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
-  const [pdfEmailByOrder, setPdfEmailByOrder] = useState<Record<string, string>>({});
-  const [pdfSendingByOrder, setPdfSendingByOrder] = useState<Record<string, boolean>>({});
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -125,43 +101,6 @@ export default function EmployeeOrdersPage() {
       await loadCustomers();
     })();
   }, []);
-
-  useEffect(() => {
-    if (!pharmacyId) return;
-
-    const q = query(
-      collection(db, "orders"),
-      where("pharmacyId", "==", pharmacyId)
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as any) }))
-        .filter(
-          (o) =>
-            !!o.legalPdfUrl &&
-            (o.status === "DELIVERED" || o.deliveredAt || o.deliveredAtISO)
-        )
-        .sort((a, b) => {
-          const toMs = (ts: any) => {
-            if (!ts) return 0;
-            if (typeof ts === "string") return new Date(ts).getTime();
-            if (ts?.toDate) return ts.toDate().getTime();
-            return 0;
-          };
-
-          return (
-            toMs(b.deliveredAt || b.deliveredAtISO || b.statusUpdatedAt || b.createdAt) -
-            toMs(a.deliveredAt || a.deliveredAtISO || a.statusUpdatedAt || a.createdAt)
-          );
-        })
-        .slice(0, 10);
-
-      setDeliveryBackups(list);
-    });
-
-    return () => unsub();
-  }, [pharmacyId]);
 
   useEffect(() => {
     if (!customerId) {
@@ -467,46 +406,6 @@ export default function EmployeeOrdersPage() {
     focusPumpSearchInput();
   }
 
-  async function handleSharePdfByEmail(backup: DeliveryBackup) {
-    if (!backup.legalPdfUrl) {
-      setError("PDF is not available yet.");
-      return;
-    }
-
-    const normalizedTo = (pdfEmailByOrder[backup.id] || "").trim();
-    if (!normalizedTo) {
-      setError("Please enter recipient email first.");
-      return;
-    }
-
-    if (!normalizedTo.includes("@")) {
-      setError("Please enter a valid email address.");
-      return;
-    }
-
-    setError("");
-    setPdfSendingByOrder((prev) => ({ ...prev, [backup.id]: true }));
-
-    try {
-      await sendAppEmail({
-        to: normalizedTo,
-        subject: `Delivery PDF - Order ${backup.id}`,
-        html: `
-          <p>Hello,</p>
-          <p>Here is the legal delivery PDF backup for order <strong>${backup.id}</strong>.</p>
-          <p><a href="${backup.legalPdfUrl}" target="_blank" rel="noreferrer">Open Delivery PDF</a></p>
-        `,
-        text: `Delivery PDF backup for order ${backup.id}: ${backup.legalPdfUrl}`,
-      });
-
-      setInfo(`PDF shared by email to ${normalizedTo}.`);
-      setPdfEmailByOrder((prev) => ({ ...prev, [backup.id]: "" }));
-      setTimeout(() => setInfo(""), 6000);
-    } finally {
-      setPdfSendingByOrder((prev) => ({ ...prev, [backup.id]: false }));
-    }
-  }
-
   /* ---------- UI ---------- */
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
@@ -684,54 +583,6 @@ export default function EmployeeOrdersPage() {
           >
             {loading ? "CREATING..." : "CREATE ORDER"}
           </button>
-        </div>
-
-        <div className="bg-black/40 border border-cyan-500/30 rounded-xl p-6">
-          <h2 className="font-semibold mb-4 text-cyan-300">Delivery PDF Backups</h2>
-          {deliveryBackups.length === 0 && (
-            <p className="text-xs text-white/60">No delivery PDFs available yet.</p>
-          )}
-          {deliveryBackups.length > 0 && (
-            <ul className="space-y-3">
-              {deliveryBackups.map((o) => (
-                <li
-                  key={`backup-${o.id}`}
-                  className="border border-cyan-500/20 rounded p-4 space-y-1"
-                >
-                  <p className="text-sm font-semibold">{o.customerName || "Customer"}</p>
-                  <p className="text-xs text-white/60">Driver: {o.driverName || "Unassigned"}</p>
-                  <p className="text-xs text-white/50">
-                    Delivered: {formatDate(o.deliveredAt || o.deliveredAtISO || o.statusUpdatedAt || o.createdAt)}
-                  </p>
-                  <a
-                    href={o.legalPdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-block text-xs px-3 py-2 rounded bg-cyan-600 hover:bg-cyan-500"
-                  >
-                    VIEW PDF
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => handleSharePdfByEmail(o)}
-                    disabled={pdfSendingByOrder[o.id] === true}
-                    className="ml-2 text-xs px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60"
-                  >
-                    {pdfSendingByOrder[o.id] ? "SENDING..." : "SHARE BY EMAIL"}
-                  </button>
-                  <input
-                    type="email"
-                    value={pdfEmailByOrder[o.id] || ""}
-                    onChange={(e) =>
-                      setPdfEmailByOrder((prev) => ({ ...prev, [o.id]: e.target.value }))
-                    }
-                    placeholder="recipient@email.com"
-                    className="mt-2 w-full p-2 rounded bg-black border border-white/10 text-xs"
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
 
         <div className="text-center">
