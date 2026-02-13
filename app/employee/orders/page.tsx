@@ -454,6 +454,19 @@ export default function EmployeeOrdersPage() {
     return customerMatch || pumpMatch;
   });
 
+  const latestFiveOrders = [...filteredOrders]
+    .sort((a, b) => {
+      const toMs = (ts: any) => {
+        if (!ts) return 0;
+        if (typeof ts === "string") return new Date(ts).getTime();
+        if (ts?.toDate) return ts.toDate().getTime();
+        return 0;
+      };
+
+      return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
+    })
+    .slice(0, 5);
+
   /* ---------- UI ---------- */
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
@@ -633,29 +646,10 @@ export default function EmployeeOrdersPage() {
           </button>
         </div>
 
-        {/* DRIVER ACTIVITY */}
-        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="font-semibold">Driver Activity</h2>
-              <p className="text-xs text-white/60">
-                Live updates from all delivery drivers
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDriverActivity(true)}
-              className="text-xs px-3 py-2 rounded bg-white/10 hover:bg-white/20"
-            >
-              View Activity
-            </button>
-          </div>
-        </div>
-
         {/* ORDERS LIST */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6">
           <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="font-semibold">Orders</h2>
+            <h2 className="font-semibold">Latest 5 Orders</h2>
             <div className="relative w-full md:max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
                 <svg
@@ -682,7 +676,7 @@ export default function EmployeeOrdersPage() {
           </div>
 
           <ul className="space-y-3">
-            {filteredOrders.map((o) => (
+            {latestFiveOrders.map((o) => (
               <li
                 key={o.id}
                 className="border border-white/10 rounded p-4 space-y-1"
