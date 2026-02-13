@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import { useEffect, useState, useRef } from "react";
 import dynamic from "next/dynamic";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -27,6 +29,13 @@ type Driver = {
   lastUpdate?: number;
 };
 
+const ACTIVE_DELIVERY_STATUSES = [
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "ON_WAY_TO_PHARMACY",
+  "ON_WAY_TO_CUSTOMER",
+] as const;
+
 export default function DriverTrackingPage() {
   const pharmacyId =
     typeof window !== "undefined" ? localStorage.getItem("PHARMACY_ID") : null;
@@ -42,6 +51,10 @@ export default function DriverTrackingPage() {
       await ensureAnonymousAuth();
       if (pharmacyId) {
         setupRealtimeTracking();
+      } else {
+        setDrivers([]);
+        setLoading(false);
+        setIsLive(false);
       }
     })();
 
@@ -58,6 +71,13 @@ export default function DriverTrackingPage() {
 
   function setupRealtimeTracking() {
     try {
+      if (!pharmacyId) {
+        setDrivers([]);
+        setLoading(false);
+        setIsLive(false);
+        return;
+      }
+
       setLoading(true);
       setIsLive(true);
 
@@ -65,12 +85,7 @@ export default function DriverTrackingPage() {
       const q = query(
         collection(db, "orders"),
         where("pharmacyId", "==", pharmacyId),
-        where("status", "in", [
-          "ASSIGNED",
-          "IN_PROGRESS",
-          "ON_WAY_TO_PHARMACY",
-          "ON_WAY_TO_CUSTOMER",
-        ])
+        where("status", "in", [...ACTIVE_DELIVERY_STATUSES])
       );
 
       unsubscribeRef.current = onSnapshot(
@@ -80,31 +95,45 @@ export default function DriverTrackingPage() {
 
           snapshot.docs.forEach((doc) => {
             const order = doc.data();
-            if (order.driverId && order.driverName) {
-              if (!driverLocations.has(order.driverId)) {
-                const latCandidate =
-                  typeof order.driverLatitude === "number"
-                    ? order.driverLatitude
-                    : typeof order.deliveredLatitude === "number"
-                    ? order.deliveredLatitude
-                    : undefined;
+            const isDeliveryForPharmacy =
+              order.pharmacyId === pharmacyId &&
+              ACTIVE_DELIVERY_STATUSES.includes(order.status) &&
+              Array.isArray(order.pumpNumbers) &&
+              order.pumpNumbers.length > 0;
 
-                const lngCandidate =
-                  typeof order.driverLongitude === "number"
-                    ? order.driverLongitude
-                    : typeof order.deliveredLongitude === "number"
-                    ? order.deliveredLongitude
-                    : undefined;
+            if (!isDeliveryForPharmacy || !order.driverId || !order.driverName) {
+              return;
+            }
 
-                driverLocations.set(order.driverId, {
-                  id: order.driverId,
-                  name: order.driverName,
-                  status: order.status,
-                  lastUpdate: order.statusUpdatedAt?.toMillis?.() || Date.now(),
-                  lat: latCandidate,
-                  lng: lngCandidate,
-                });
-              }
+            const latCandidate =
+              typeof order.driverLatitude === "number"
+                ? order.driverLatitude
+                : typeof order.deliveredLatitude === "number"
+                ? order.deliveredLatitude
+                : undefined;
+
+            const lngCandidate =
+              typeof order.driverLongitude === "number"
+                ? order.driverLongitude
+                : typeof order.deliveredLongitude === "number"
+                ? order.deliveredLongitude
+                : undefined;
+
+            const currentDriver: Driver = {
+              id: order.driverId,
+              name: order.driverName,
+              status: order.status,
+              lastUpdate: order.statusUpdatedAt?.toMillis?.() || Date.now(),
+              lat: latCandidate,
+              lng: lngCandidate,
+            };
+
+            const existingDriver = driverLocations.get(order.driverId);
+            if (
+              !existingDriver ||
+              (currentDriver.lastUpdate || 0) >= (existingDriver.lastUpdate || 0)
+            ) {
+              driverLocations.set(order.driverId, currentDriver);
             }
           });
 
@@ -197,7 +226,7 @@ export default function DriverTrackingPage() {
             </div>
           </div>
           <p className="text-sm text-slate-400">
-            Monitoring {drivers.length} active driver{drivers.length !== 1 ? 's' : ''} • Updates every 8 seconds
+            Monitoring {drivers.length} active delivery driver{drivers.length !== 1 ? 's' : ''} • Updates every 8 seconds
           </p>
         </div>
 
@@ -229,7 +258,7 @@ export default function DriverTrackingPage() {
             <MapComponent drivers={drivers} />
           ) : (
             <div className="h-96 flex items-center justify-center text-slate-400">
-              <p>No active drivers at this moment</p>
+              <p>No active delivery drivers at this moment</p>
             </div>
           )}
         </div>
@@ -242,7 +271,7 @@ export default function DriverTrackingPage() {
           </h2>
           {drivers.length === 0 ? (
             <div className="bg-slate-800/30 rounded-lg p-4 text-center text-slate-400 text-sm">
-              No drivers currently active
+              No delivery drivers currently active
             </div>
           ) : (
             <div className="grid gap-3">

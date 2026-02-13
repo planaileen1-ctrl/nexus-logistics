@@ -7,11 +7,14 @@
  * Last verified: 2026-02-09
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/exhaustive-deps */
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, Truck, RotateCcw, Link2, FileText, PackageOpen } from "lucide-react";
+import { LayoutDashboard, Truck, RotateCcw, Link2, FileText, PackageOpen, AlertTriangle } from "lucide-react";
 import {
   collection,
   getDocs,
@@ -252,6 +255,13 @@ export default function DriverDashboardPage() {
   const [dashboardSection, setDashboardSection] = useState<
     "home" | "active" | "returns" | "connect"
   >("home");
+
+  const pendingReturnPumpCount = returnTasks.reduce(
+    (count, task) => count + task.pumps.length,
+    0
+  );
+
+  const hasPendingReturns = pendingReturnPumpCount > 0;
 
   useEffect(() => {
     (async () => {
@@ -824,12 +834,19 @@ export default function DriverDashboardPage() {
             className={`py-2 rounded-lg text-xs font-semibold border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/40 ${
               dashboardSection === "returns"
                 ? "bg-amber-500/20 border-amber-400/50 text-amber-200"
+                : hasPendingReturns
+                ? "bg-red-500/20 border-red-400/50 text-red-200 hover:border-red-300/70"
                 : "bg-black/30 border-white/10 hover:border-white/30"
             }`}
           >
             <span className="inline-flex items-center justify-center gap-1.5">
               <RotateCcw size={14} />
               RETURNS
+              {hasPendingReturns && (
+                <span className="inline-flex min-w-5 h-5 items-center justify-center rounded-full bg-red-600 text-white text-[10px] px-1">
+                  {pendingReturnPumpCount}
+                </span>
+              )}
             </span>
           </button>
           <button
@@ -857,6 +874,18 @@ export default function DriverDashboardPage() {
             </span>
           </button>
         </div>
+
+        {hasPendingReturns && (
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3">
+            <p className="text-sm font-semibold text-red-300 inline-flex items-center gap-2">
+              <AlertTriangle size={16} />
+              Warning: You have {pendingReturnPumpCount} pump{pendingReturnPumpCount !== 1 ? "s" : ""} pending return.
+            </p>
+            <p className="text-xs text-red-200/80 mt-1">
+              Open the RETURNS section to see which pumps must be returned.
+            </p>
+          </div>
+        )}
 
         {/* NEW ORDERS */}
         <div className="bg-gradient-to-br from-emerald-500/10 to-black/60 border border-emerald-500/30 rounded-2xl p-8 shadow-[0_0_40px_rgba(16,185,129,0.08)]">

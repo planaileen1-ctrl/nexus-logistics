@@ -123,7 +123,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-indigo-300 text-4xl group-hover:scale-110 transition-transform">🏥</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-indigo-100 transition">Medical Pumps</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Register and manage hospital medical pumps linked to orders.</p>
               </div>
               <p className="text-xs text-indigo-400 font-semibold">Go to pump management →</p>
             </div>
@@ -139,7 +138,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-emerald-300 text-4xl group-hover:scale-110 transition-transform">👥</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-emerald-100 transition">Customers</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Create and manage patient & pharmacy customers with full records.</p>
               </div>
               <p className="text-xs text-emerald-400 font-semibold">Go to customer management →</p>
             </div>
@@ -155,7 +153,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-amber-300 text-4xl group-hover:scale-110 transition-transform">📦</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-amber-100 transition">New Shipping Orders</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Write and create new delivery orders by customer, pump, and destination.</p>
               </div>
               <p className="text-xs text-amber-400 font-semibold">Create a new order →</p>
             </div>
@@ -171,7 +168,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-blue-300 text-4xl group-hover:scale-110 transition-transform">🧪</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-blue-100 transition">Return Reminders</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Review returned pumps and manage reminder notes by customer.</p>
               </div>
               <p className="text-xs text-blue-400 font-semibold">Open reminders →</p>
             </div>
@@ -187,7 +183,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-rose-300 text-4xl group-hover:scale-110 transition-transform">↩️</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-rose-100 transition">Pump Returns</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Confirm returns and track non-return reasons with records.</p>
               </div>
               <p className="text-xs text-rose-400 font-semibold">View return log →</p>
             </div>
@@ -203,7 +198,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-lime-300 text-4xl group-hover:scale-110 transition-transform">🧰</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-lime-100 transition">Pump Maintenance</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Track cleaning, calibration, and inspection workflows.</p>
               </div>
               <p className="text-xs text-lime-400 font-semibold">Open maintenance →</p>
             </div>
@@ -219,7 +213,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">🚚</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-cyan-100 transition">Orders Activity</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Track created orders and every driver status update from assignment to delivery.</p>
               </div>
               <p className="text-xs text-cyan-400 font-semibold">View orders activity →</p>
             </div>
@@ -235,7 +228,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">📄</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-cyan-100 transition">Delivery PDF Backups</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Open legal delivery PDFs and share them by email.</p>
               </div>
               <p className="text-xs text-cyan-400 font-semibold">Open PDF backups →</p>
             </div>
@@ -251,7 +243,6 @@ export default function EmployeeDashboardPage() {
               <div className="text-red-300 text-4xl group-hover:scale-110 transition-transform">📍</div>
               <div className="space-y-2">
                 <h2 className="text-lg font-bold group-hover:text-red-100 transition">Driver Tracking</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Monitor active drivers in real-time on an interactive map location system.</p>
               </div>
               <p className="text-xs text-red-400 font-semibold">View live map →</p>
             </div>
