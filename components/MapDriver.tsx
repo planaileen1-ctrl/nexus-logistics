@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Leaflet Map Component (Pure Leaflet, no external dependencies)
@@ -22,8 +22,13 @@ type Driver = {
 };
 
 const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
-  useEffect(() => {
-    // Load Leaflet CSS dynamically if not already loaded
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markersLayerRef = useRef<any>(null);
+
+  async function ensureLeaflet() {
+    if (typeof window === "undefined") return null;
+
     const styleId = "leaflet-css";
     if (!document.getElementById(styleId)) {
       const link = document.createElement("link");
@@ -33,50 +38,62 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
       document.head.appendChild(link);
     }
 
-    // Load Leaflet JS dynamically if not already loaded
-    const scriptId = "leaflet-js";
-    if (!window.L && !document.getElementById(scriptId)) {
+    if (window.L) return window.L;
+
+    await new Promise<void>((resolve, reject) => {
+      const scriptId = "leaflet-js";
+      const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(), { once: true });
+        existingScript.addEventListener("error", () => reject(new Error("Failed to load Leaflet")), {
+          once: true,
+        });
+        return;
+      }
+
       const script = document.createElement("script");
       script.id = scriptId;
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-      script.onload = () => {
-        initializeMap();
-      };
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Leaflet"));
       document.body.appendChild(script);
-    } else if (window.L) {
-      initializeMap();
-    }
+    });
 
-    function initializeMap() {
-      const L = window.L;
-      const mapContainer = document.getElementById("map-container") as any;
-      
-      if (!mapContainer) return;
+    return window.L;
+  }
 
-      // Remove existing map if present
-      if (mapContainer._leaflet_map) {
-        mapContainer._leaflet_map.remove();
-      }
+  useEffect(() => {
+    let cancelled = false;
 
-      // Create new map centered on USA
-      const map = L.map("map-container").setView([39.8283, -98.5795], 4);
+    (async () => {
+      try {
+        const L = await ensureLeaflet();
+        if (!L || cancelled || !containerRef.current) return;
 
-      // Add OpenStreetMap tile layer
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
-      }).addTo(map);
+        if (!mapRef.current) {
+          mapRef.current = L.map(containerRef.current).setView([39.8283, -98.5795], 4);
 
-      // Add circle markers for each driver
-      drivers.forEach((driver) => {
-        if (driver.lat !== undefined && driver.lng !== undefined) {
-          const colorMap: { [key: string]: string } = {
-            ON_WAY_TO_CUSTOMER: "#3388ff",      // Blue
-            ON_WAY_TO_PHARMACY: "#ff7800",       // Orange
-            IN_PROGRESS: "#ffb900",              // Yellow
-            ASSIGNED: "#00c651",                 // Green
-          };
-          
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap contributors",
+            maxZoom: 19,
+          }).addTo(mapRef.current);
+
+          markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
+        }
+
+        const colorMap: { [key: string]: string } = {
+          ON_WAY_TO_CUSTOMER: "#3388ff",
+          ON_WAY_TO_PHARMACY: "#ff7800",
+          IN_PROGRESS: "#ffb900",
+          ASSIGNED: "#00c651",
+        };
+
+        markersLayerRef.current?.clearLayers();
+
+        drivers.forEach((driver) => {
+          if (driver.lat === undefined || driver.lng === undefined) return;
+
           const markerColor = colorMap[driver.status || ""] || "#666";
 
           L.circleMarker([driver.lat, driver.lng], {
@@ -94,27 +111,46 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
                 <small>${driver.status || "Active"}</small>
               </div>`
             )
-            .addTo(map);
-        }
-      });
+            .addTo(markersLayerRef.current);
+        });
 
-      // Fit bounds if drivers have locations
-      const driversWithLocation = drivers.filter(
-        (d) => d.lat !== undefined && d.lng !== undefined
-      );
-
-      if (driversWithLocation.length > 0) {
-        const bounds = L.latLngBounds(
-          driversWithLocation.map((d) => [d.lat!, d.lng!])
+        const driversWithLocation = drivers.filter(
+          (d) => d.lat !== undefined && d.lng !== undefined
         );
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+
+        if (driversWithLocation.length > 0) {
+          const bounds = L.latLngBounds(driversWithLocation.map((d) => [d.lat!, d.lng!]));
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+        } else {
+          mapRef.current.setView([39.8283, -98.5795], 4);
+        }
+
+        setTimeout(() => {
+          mapRef.current?.invalidateSize();
+        }, 0);
+      } catch (error) {
+        console.error("Map initialization error:", error);
       }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [drivers]);
+
+  useEffect(() => {
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      markersLayerRef.current = null;
+    };
+  }, []);
 
   return (
     <div
-      id="map-container"
+      ref={containerRef}
       style={{
         width: "100%",
         height: "24rem", // h-96
