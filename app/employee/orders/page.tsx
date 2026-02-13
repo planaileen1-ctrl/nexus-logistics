@@ -18,6 +18,7 @@ import {
   addDoc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   where,
   serverTimestamp,
@@ -148,8 +149,40 @@ export default function EmployeeOrdersPage() {
   }, [customerId]);
 
   useEffect(() => {
-    if (currentView !== "activity") return;
-    loadOrdersActivity();
+    if (currentView !== "activity" || !pharmacyId) return;
+
+    setActivityLoading(true);
+
+    const q = query(
+      collection(db, "orders"),
+      where("pharmacyId", "==", pharmacyId)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        })) as ActivityOrder[];
+
+        list.sort((a, b) => {
+          const aTime = timestampToMillis(a.createdAt) || timestampToMillis(a.statusUpdatedAt);
+          const bTime = timestampToMillis(b.createdAt) || timestampToMillis(b.statusUpdatedAt);
+          return bTime - aTime;
+        });
+
+        setActivityOrders(list);
+        setActivityLoading(false);
+      },
+      (err) => {
+        console.error("orders activity realtime listener error:", err);
+        setError("Failed to load orders activity");
+        setActivityLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [currentView, pharmacyId]);
 
   /* ---------- Loaders ---------- */
