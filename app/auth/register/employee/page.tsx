@@ -34,6 +34,7 @@ export default function EmployeeRegisterPage() {
   const [pharmacyPin, setPharmacyPin] = useState("");
 
   const [pharmacy, setPharmacy] = useState<any>(null);
+  const [pharmacyId, setPharmacyId] = useState<string | null>(null);
 
   // FLOW STATE
   const [employeePin, setEmployeePin] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export default function EmployeeRegisterPage() {
     }
 
     setPharmacy(result);
+    setPharmacyId(result.id);
   }
 
   // 👤 Register employee
@@ -99,6 +101,7 @@ export default function EmployeeRegisterPage() {
 
       setEmployeeId(result.employeeId);
       setEmployeePin(result.pin);
+      setPharmacyId(pharmacy?.id ?? null);
       setStep("SIGNATURE");
     } catch (err) {
       console.error(err);
@@ -109,7 +112,7 @@ export default function EmployeeRegisterPage() {
   }
 
   // ✍️ SIGNATURE SCREEN
-  if (step === "SIGNATURE" && employeeId && employeePin) {
+  if (step === "SIGNATURE" && employeeId && employeePin && pharmacyId) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#020617] text-white">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 max-w-md w-full text-center">
@@ -141,14 +144,15 @@ export default function EmployeeRegisterPage() {
                 await saveEmployeeSignature({
                   employeeId,
                   employeeName: fullName,
-                  pharmacyId: pharmacy.id,
+                  pharmacyId,
                   signatureBase64,
                 });
 
                 setSignatureSaved(true);
               } catch (err) {
                 console.error(err);
-                setSignatureError("Failed to save signature. Please try again.");
+                const message = err instanceof Error ? err.message : "Unknown error";
+                setSignatureError(`Failed to save signature. ${message}`);
               } finally {
                 setSavingSignature(false);
               }
