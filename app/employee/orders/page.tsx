@@ -18,7 +18,6 @@ import {
   addDoc,
   getDoc,
   getDocs,
-  onSnapshot,
   query,
   where,
   serverTimestamp,
@@ -46,40 +45,7 @@ type Customer = {
   returnReminderNote?: string;
 };
 
-type Order = {
-  id: string;
-  pumpNumbers: string[];
-  customerName: string;
-  customerCity?: string;
-  customerAddress?: string;
-  customerState?: string;
-  customerCountry?: string;
-  customerPreviousPumps?: string[];
-  createdByEmployeeName: string;
-  status: string;
-  createdAt: any;
-  statusUpdatedAt?: any;
-  assignedAt?: any;
-  deliveredAt?: any;
-  deliveredAtISO?: string;
-  driverName?: string;
-};
-
 /* ---------- Helpers ---------- */
-function formatDate(ts: any) {
-  if (!ts) return "—";
-  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
-  if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
-  return "—";
-}
-
-function getEffectiveOrderStatus(order: Order) {
-  const rawStatus = String(order.status || "").trim().toUpperCase();
-  if (rawStatus === "DELIVERED") return "DELIVERED";
-  if (order.deliveredAt || order.deliveredAtISO) return "DELIVERED";
-  return rawStatus || "PENDING";
-}
-
 export default function EmployeeOrdersPage() {
   const router = useRouter();
 
@@ -107,7 +73,6 @@ export default function EmployeeOrdersPage() {
   /* ---------- State ---------- */
   const [pumps, setPumps] = useState<Pump[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
 
   const [pumpIds, setPumpIds] = useState<string[]>([]);
   const [pumpNumbers, setPumpNumbers] = useState<string[]>([]);
@@ -116,7 +81,6 @@ export default function EmployeeOrdersPage() {
   const [customerId, setCustomerId] = useState("");
   const [customerPreviousPumps, setCustomerPreviousPumps] = useState<string[]>([]);
   const [customerPumpsLoading, setCustomerPumpsLoading] = useState(false);
-  const [orderSearch, setOrderSearch] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -125,8 +89,6 @@ export default function EmployeeOrdersPage() {
 
   /* ---------- Init ---------- */
   useEffect(() => {
-    let unsubscribe: null | (() => void) = null;
-
     (async () => {
       await ensureAnonymousAuth();
 
@@ -137,12 +99,7 @@ export default function EmployeeOrdersPage() {
 
       await loadPumps();
       await loadCustomers();
-      unsubscribe = subscribeOrders();
     })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, []);
 
   useEffect(() => {
@@ -230,24 +187,6 @@ export default function EmployeeOrdersPage() {
     } finally {
       setCustomerPumpsLoading(false);
     }
-  }
-
-  function subscribeOrders() {
-    if (!pharmacyId) return () => {};
-
-    const q = query(
-      collection(db, "orders"),
-      where("pharmacyId", "==", pharmacyId)
-    );
-
-    return onSnapshot(q, (snap) => {
-      setOrders(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        }))
-      );
-    });
   }
 
   /* ---------- Create Order ---------- */
@@ -467,32 +406,6 @@ export default function EmployeeOrdersPage() {
     focusPumpSearchInput();
   }
 
-  const filteredOrders = orders.filter((o) => {
-    const term = orderSearch.trim().toLowerCase();
-    const normalizedTerm = normalizePumpScannerInput(orderSearch).toLowerCase();
-    if (!term) return true;
-
-    const customerMatch = o.customerName?.toLowerCase().includes(term);
-    const pumpMatch = (o.pumpNumbers || []).some((num) =>
-      String(num).toLowerCase().includes(normalizedTerm || term)
-    );
-
-    return customerMatch || pumpMatch;
-  });
-
-  const activeOrders = [...filteredOrders]
-    .filter((o) => getEffectiveOrderStatus(o) !== "DELIVERED")
-    .sort((a, b) => {
-      const toMs = (ts: any) => {
-        if (!ts) return 0;
-        if (typeof ts === "string") return new Date(ts).getTime();
-        if (ts?.toDate) return ts.toDate().getTime();
-        return 0;
-      };
-
-      return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
-    });
-
   /* ---------- UI ---------- */
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
@@ -670,98 +583,6 @@ export default function EmployeeOrdersPage() {
           >
             {loading ? "CREATING..." : "CREATE ORDER"}
           </button>
-        </div>
-
-        {/* ORDERS LIST */}
-        <div className="bg-black/40 border border-white/10 rounded-xl p-6">
-          <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
-            <h2 className="font-semibold">Orders</h2>
-            <div className="relative w-full md:max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <input
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                placeholder="Search by customer or pump (barcode/QR supported)..."
-                className="w-full p-2 pl-9 rounded bg-black border border-white/10"
-              />
-            </div>
-          </div>
-
-          {activeOrders.length === 0 && (
-            <p className="text-xs text-white/60">No active orders yet.</p>
-          )}
-
-          <ul className="space-y-3">
-            {activeOrders.map((o) => (
-              <li
-                key={o.id}
-                className="border border-white/10 rounded p-4 space-y-1"
-              >
-                {(() => {
-                  const effectiveStatus = getEffectiveOrderStatus(o);
-
-                  return (
-                    <>
-                <p className="font-medium">
-                  Pumps: {o.pumpNumbers?.join(", ")} → {o.customerName}
-                </p>
-
-                <p className="text-xs">
-                  Status:{" "}
-                  <span
-                    className={
-                      effectiveStatus === "DELIVERED"
-                        ? "text-green-400"
-                        : "text-yellow-400"
-                    }
-                  >
-                    {effectiveStatus}
-                  </span>
-                </p>
-
-                <p className="text-xs text-white/60">
-                  Driver: {o.driverName || "—"}
-                </p>
-
-                <p className="text-xs text-white/50">
-                  Last update: {formatDate(o.statusUpdatedAt || o.createdAt)}
-                </p>
-
-                {o.assignedAt && (
-                  <p className="text-xs text-white/50">
-                    Assigned: {formatDate(o.assignedAt)}
-                  </p>
-                )}
-
-                {(o.deliveredAt || o.deliveredAtISO) && (
-                  <p className="text-xs text-white/40">
-                    Delivered: {formatDate(o.deliveredAt || o.deliveredAtISO)}
-                  </p>
-                )}
-
-                <p className="text-xs text-white/40">
-                  Created: {formatDate(o.createdAt)}
-                </p>
-                    </>
-                  );
-                })()}
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className="text-center">
