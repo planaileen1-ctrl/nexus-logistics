@@ -95,6 +95,48 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
+          {/* PUMPS MANAGER */}
+          <div
+            onClick={() => router.push("/employee/pumps-manager")}
+            className="cursor-pointer bg-black/40 border border-blue-500/30 hover:border-blue-500
+                       rounded-xl p-6 transition-all hover:scale-[1.02] hover:bg-black/60"
+          >
+            <div className="space-y-3">
+              <div className="text-blue-400 text-2xl">🧪</div>
+              <h2 className="text-xl font-semibold">
+                Pumps Manager
+              </h2>
+              <p className="text-sm text-white/60">
+                See which customers have pumps and send
+                return reminders for the next delivery.
+              </p>
+              <p className="text-xs text-blue-400">
+                Open pumps manager →
+              </p>
+            </div>
+          </div>
+
+          {/* PUMP RETURNS */}
+          <div
+            onClick={() => router.push("/employee/pump-returns")}
+            className="cursor-pointer bg-black/40 border border-rose-500/30 hover:border-rose-500
+                       rounded-xl p-6 transition-all hover:scale-[1.02] hover:bg-black/60"
+          >
+            <div className="space-y-3">
+              <div className="text-rose-400 text-2xl">↩️</div>
+              <h2 className="text-xl font-semibold">
+                Pump Returns
+              </h2>
+              <p className="text-sm text-white/60">
+                Track returned pumps and reasons
+                when pumps are not returned.
+              </p>
+              <p className="text-xs text-rose-400">
+                View return log →
+              </p>
+            </div>
+          </div>
+
           {/* DRIVER ACTIVITY */}
           <div
             onClick={() => router.push("/employee/orders?view=activity")}

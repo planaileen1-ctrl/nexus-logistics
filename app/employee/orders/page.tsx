@@ -40,6 +40,7 @@ type Customer = {
   address?: string;
   state?: string;
   country?: string;
+  returnReminderNote?: string;
 };
 
 type Order = {
@@ -195,6 +196,7 @@ export default function EmployeeOrdersPage() {
         address: d.data().address,
         state: d.data().state,
         country: d.data().country,
+        returnReminderNote: d.data().returnReminderNote,
       }))
     );
   }
@@ -301,6 +303,8 @@ export default function EmployeeOrdersPage() {
         customerState: customers.find((c) => c.id === customerId)?.state,
         customerCountry: customers.find((c) => c.id === customerId)?.country,
         customerPreviousPumps,
+        returnReminderNote:
+          customers.find((c) => c.id === customerId)?.returnReminderNote || "",
         createdByEmployeeName: employeeName,
         createdByEmployeeId: employeeId,
         status: "PENDING",
@@ -501,6 +505,12 @@ export default function EmployeeOrdersPage() {
                     </span>
                   ))}
                 </div>
+              )}
+
+              {customers.find((c) => c.id === customerId)?.returnReminderNote && (
+                <p className="text-xs text-yellow-300">
+                  Reminder for driver: {customers.find((c) => c.id === customerId)?.returnReminderNote}
+                </p>
               )}
             </div>
           )}

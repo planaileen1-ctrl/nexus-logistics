@@ -51,6 +51,7 @@ type Order = {
   customerState?: string;
   customerCountry?: string;
   customerPreviousPumps?: string[];
+  returnReminderNote?: string;
   status: string;
   driverId?: string;
   driverName?: string;
@@ -169,6 +170,8 @@ export default function DriverDashboardPage() {
   const [employeeSignature, setEmployeeSignature] = useState("");
   const [driverPickupSignature, setDriverPickupSignature] = useState("");
   const [receiverName, setReceiverName] = useState("");
+  const [previousPumpsReturned, setPreviousPumpsReturned] = useState<null | boolean>(null);
+  const [previousPumpsReturnReason, setPreviousPumpsReturnReason] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
@@ -315,7 +318,10 @@ export default function DriverDashboardPage() {
       activeOrders.find((o) => o.id === id);
 
     if (order) {
-      if (order.customerPreviousPumps && order.customerPreviousPumps.length > 0) {
+      if (order.returnReminderNote) {
+        setAcceptInfo(order.returnReminderNote);
+        setTimeout(() => setAcceptInfo(""), 7000);
+      } else if (order.customerPreviousPumps && order.customerPreviousPumps.length > 0) {
         setAcceptInfo(
           `Reminder: this customer already has pumps ${order.customerPreviousPumps.join(", ")}. Please request them.`
         );
@@ -375,6 +381,18 @@ export default function DriverDashboardPage() {
     if (!signature || !driverSignature) {
       setDeliveryError("Both customer and driver signatures are required.");
       return;
+    }
+
+    if (selectedOrder.customerPreviousPumps && selectedOrder.customerPreviousPumps.length > 0) {
+      if (previousPumpsReturned === null) {
+        setDeliveryError("Please confirm whether previous pumps were returned.");
+        return;
+      }
+
+      if (previousPumpsReturned === false && !previousPumpsReturnReason.trim()) {
+        setDeliveryError("Please provide a reason for not returning pumps.");
+        return;
+      }
     }
 
     setDeliveryLoading(true);
@@ -454,6 +472,9 @@ export default function DriverDashboardPage() {
         customerName: selectedOrder.customerName,
         customerAddress: selectedOrder.customerAddress,
         receivedByName: receiverName.trim(),
+        previousPumps: selectedOrder.customerPreviousPumps || [],
+        previousPumpsReturned,
+        previousPumpsReturnReason: previousPumpsReturnReason.trim(),
         driverId,
         driverName,
         signatureUrl,
@@ -481,6 +502,9 @@ export default function DriverDashboardPage() {
         deliveredLongitude: location.lng,
         legalPdfUrl,
         receivedByName: receiverName.trim(),
+        previousPumps: selectedOrder.customerPreviousPumps || [],
+        previousPumpsReturned,
+        previousPumpsReturnReason: previousPumpsReturnReason.trim(),
         status: "DELIVERED",
         statusUpdatedAt: serverTimestamp(),
       });
@@ -530,6 +554,8 @@ export default function DriverDashboardPage() {
       setSignature(null);
       setDriverSignature("");
       setReceiverName("");
+      setPreviousPumpsReturned(null);
+      setPreviousPumpsReturnReason("");
       setDeliveryInfo("Delivery saved successfully.");
       setTimeout(() => setDeliveryInfo(""), 6000);
     }
@@ -645,6 +671,12 @@ export default function DriverDashboardPage() {
                 {o.customerPreviousPumps && o.customerPreviousPumps.length > 0 && (
                   <p className="text-xs text-yellow-300">
                     Reminder: customer already has pumps {o.customerPreviousPumps.join(", ")}. Please request them.
+                  </p>
+                )}
+
+                {o.returnReminderNote && (
+                  <p className="text-xs text-yellow-300">
+                    Reminder: {o.returnReminderNote}
                   </p>
                 )}
               </li>
@@ -779,6 +811,57 @@ export default function DriverDashboardPage() {
                 mode="auto"
                 onSave={(dataUrl) => setDriverSignature(dataUrl)}
               />
+
+              {selectedOrder.customerPreviousPumps &&
+                selectedOrder.customerPreviousPumps.length > 0 && (
+                  <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-3">
+                    <p className="text-sm font-semibold">Previous Pumps To Return</p>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedOrder.customerPreviousPumps.map((num) => (
+                        <span
+                          key={num}
+                          className="bg-white/10 text-xs px-3 py-1 rounded"
+                        >
+                          Pump #{num}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs text-white/70">Were these pumps returned?</p>
+                      <div className="flex items-center gap-4 text-xs">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="previousPumpsReturned"
+                            checked={previousPumpsReturned === true}
+                            onChange={() => setPreviousPumpsReturned(true)}
+                          />
+                          Yes
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="previousPumpsReturned"
+                            checked={previousPumpsReturned === false}
+                            onChange={() => setPreviousPumpsReturned(false)}
+                          />
+                          No
+                        </label>
+                      </div>
+
+                      {previousPumpsReturned === false && (
+                        <textarea
+                          value={previousPumpsReturnReason}
+                          onChange={(e) => setPreviousPumpsReturnReason(e.target.value)}
+                          placeholder="Reason for not returning pumps"
+                          className="w-full p-2 rounded bg-black border border-white/10 text-xs"
+                          rows={3}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
 
               {deliveryError && (
                 <p className="text-red-400 text-sm">{deliveryError}</p>
