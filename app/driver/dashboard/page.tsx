@@ -52,6 +52,11 @@ type Order = {
   customerCountry?: string;
   customerPreviousPumps?: string[];
   returnReminderNote?: string;
+  previousPumpsStatus?: { pumpNumber: string; returned: boolean; reason?: string }[];
+  previousPumpsReturnToPharmacy?: {
+    pumpNumber: string;
+    returnedToPharmacy: boolean;
+  }[];
   status: string;
   driverId?: string;
   driverName?: string;
@@ -160,6 +165,9 @@ export default function DriverDashboardPage() {
   const [connectedPharmacies, setConnectedPharmacies] = useState<Pharmacy[]>([]);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [returnTasks, setReturnTasks] = useState<
+    { orderId: string; customerName: string; pumps: string[] }[]
+  >([]);
 
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
@@ -234,8 +242,24 @@ export default function DriverDashboardPage() {
           ].includes(o.status)
       );
 
+      const tasks = all
+        .filter((o) => o.driverId === driverId)
+        .map((o) => {
+          const pending = (o.previousPumpsReturnToPharmacy || [])
+            .filter((entry) => !entry.returnedToPharmacy)
+            .map((entry) => String(entry.pumpNumber));
+
+          return {
+            orderId: o.id,
+            customerName: o.customerName,
+            pumps: pending,
+          };
+        })
+        .filter((entry) => entry.pumps.length > 0);
+
       setAvailableOrders(available);
       setActiveOrders(active);
+      setReturnTasks(tasks);
     });
 
     return unsub;
@@ -409,6 +433,13 @@ export default function DriverDashboardPage() {
       };
     });
 
+    const previousPumpsReturnToPharmacy = previousPumpsStatusList
+      .filter((entry) => entry.returned)
+      .map((entry) => ({
+        pumpNumber: entry.pumpNumber,
+        returnedToPharmacy: false,
+      }));
+
     if (previousPumpsStatusList.length > 0) {
       const missingReason = previousPumpsStatusList.find(
         (entry) => !entry.returned && !entry.reason
@@ -507,6 +538,7 @@ export default function DriverDashboardPage() {
         previousPumps: previousPumpsList,
         previousPumpsReturned,
         previousPumpsStatus: previousPumpsStatusList,
+        previousPumpsReturnToPharmacy,
         driverId,
         driverName,
         signatureUrl,
@@ -537,6 +569,7 @@ export default function DriverDashboardPage() {
         previousPumps: previousPumpsList,
         previousPumpsReturned,
         previousPumpsStatus: previousPumpsStatusList,
+        previousPumpsReturnToPharmacy,
         status: "DELIVERED",
         statusUpdatedAt: serverTimestamp(),
       });
@@ -608,6 +641,29 @@ export default function DriverDashboardPage() {
             {acceptInfo}
           </p>
         )}
+
+        {/* RETURN TASKS */}
+        <div className="bg-black/40 border border-amber-500/30 rounded-xl p-6">
+          <h2 className="font-semibold mb-4 text-amber-400">Return Tasks</h2>
+          {returnTasks.length === 0 && (
+            <p className="text-xs text-white/60">No pending returns.</p>
+          )}
+          {returnTasks.length > 0 && (
+            <ul className="space-y-3">
+              {returnTasks.map((task) => (
+                <li
+                  key={`${task.orderId}-${task.customerName}`}
+                  className="border border-amber-500/30 rounded p-4 space-y-1"
+                >
+                  <p className="text-sm font-semibold">{task.customerName}</p>
+                  <p className="text-xs text-white/60">
+                    Pumps to return: {task.pumps.join(", ")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {/* CONNECT PHARMACY */}
         <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
@@ -814,8 +870,8 @@ export default function DriverDashboardPage() {
 
         {/* DELIVERY MODAL */}
         {showDeliveryModal && selectedOrder && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
-            <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-full max-w-md">
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center px-4">
+            <div className="bg-[#020617] p-6 rounded-xl space-y-4 w-full max-w-md max-h-[90vh] overflow-y-auto">
               <p className="font-semibold">
                 Customer: {selectedOrder.customerName}
               </p>
@@ -876,7 +932,12 @@ export default function DriverDashboardPage() {
                                   }))
                                 }
                               />
-                              Pump #{key} returned
+                              Customer returned pump #{key}
+                              {!status.returned && (
+                                <span className="ml-2 rounded bg-red-500/20 text-red-300 px-2 py-0.5 text-[10px]">
+                                  Not returned
+                                </span>
+                              )}
                             </label>
 
                             {!status.returned && (

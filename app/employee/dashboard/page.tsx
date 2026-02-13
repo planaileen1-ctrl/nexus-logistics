@@ -137,6 +137,27 @@ export default function EmployeeDashboardPage() {
             </div>
           </div>
 
+          {/* PUMP MAINTENANCE */}
+          <div
+            onClick={() => router.push("/employee/pump-maintenance")}
+            className="cursor-pointer bg-black/40 border border-emerald-500/30 hover:border-emerald-500
+                       rounded-xl p-6 transition-all hover:scale-[1.02] hover:bg-black/60"
+          >
+            <div className="space-y-3">
+              <div className="text-emerald-400 text-2xl">🧰</div>
+              <h2 className="text-xl font-semibold">
+                Pump Maintenance
+              </h2>
+              <p className="text-sm text-white/60">
+                Track cleaning, calibration, and inspection
+                after pumps return to the pharmacy.
+              </p>
+              <p className="text-xs text-emerald-400">
+                Open maintenance →
+              </p>
+            </div>
+          </div>
+
           {/* DRIVER ACTIVITY */}
           <div
             onClick={() => router.push("/employee/orders?view=activity")}

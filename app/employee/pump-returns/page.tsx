@@ -11,7 +11,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  updateDoc,
+  doc,
+  getDocs,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 
 type ReturnOrder = {
@@ -24,6 +33,10 @@ type ReturnOrder = {
   previousPumpsStatus?: { pumpNumber: string; returned: boolean; reason?: string }[];
   previousPumpsReturned?: boolean | null;
   previousPumpsReturnReason?: string;
+  previousPumpsReturnToPharmacy?: {
+    pumpNumber: string;
+    returnedToPharmacy: boolean;
+  }[];
   driverName?: string;
   status?: string;
   statusUpdatedAt?: any;
@@ -46,6 +59,10 @@ export default function PumpReturnsPage() {
       : null;
 
   const [orders, setOrders] = useState<ReturnOrder[]>([]);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [info, setInfo] = useState("");
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<"all" | "pending" | "returned">("all");
 
   useEffect(() => {
     let unsubscribe: null | (() => void) = null;
@@ -79,6 +96,116 @@ export default function PumpReturnsPage() {
     };
   }, []);
 
+  function isPumpReturnedToPharmacy(order: ReturnOrder, pumpNumber: string) {
+    const entry = (order.previousPumpsReturnToPharmacy || []).find(
+      (item) => String(item.pumpNumber) === String(pumpNumber)
+    );
+
+    return entry?.returnedToPharmacy === true;
+  }
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    const toMs = (ts: any) => {
+      if (!ts) return 0;
+      if (typeof ts === "string") return new Date(ts).getTime();
+      if (ts?.toDate) return ts.toDate().getTime();
+      return 0;
+    };
+
+    return toMs(b.statusUpdatedAt || b.createdAt) - toMs(a.statusUpdatedAt || a.createdAt);
+  });
+
+  const filteredOrders = sortedOrders.filter((order) => {
+    if (filter === "all") return true;
+
+    const pumps = order.previousPumpsStatus || [];
+    if (pumps.length === 0) return false;
+
+    const allReturned = pumps.every((entry) =>
+      isPumpReturnedToPharmacy(order, entry.pumpNumber)
+    );
+    const anyPending = pumps.some(
+      (entry) => !isPumpReturnedToPharmacy(order, entry.pumpNumber)
+    );
+
+    if (filter === "returned") return allReturned;
+    return anyPending;
+  });
+
+  const counts = {
+    all: sortedOrders.length,
+    pending: sortedOrders.filter((order) => {
+      const pumps = order.previousPumpsStatus || [];
+      if (pumps.length === 0) return false;
+      return pumps.some((entry) => !isPumpReturnedToPharmacy(order, entry.pumpNumber));
+    }).length,
+    returned: sortedOrders.filter((order) => {
+      const pumps = order.previousPumpsStatus || [];
+      if (pumps.length === 0) return false;
+      return pumps.every((entry) => isPumpReturnedToPharmacy(order, entry.pumpNumber));
+    }).length,
+  };
+
+  async function handleConfirmReturn(order: ReturnOrder, pumpNumber: string) {
+    if (!pharmacyId) return;
+
+    setError("");
+    setInfo("");
+    setLoadingId(`${order.id}-${pumpNumber}`);
+
+    try {
+      const updated = [...(order.previousPumpsReturnToPharmacy || [])];
+      const idx = updated.findIndex(
+        (item) => String(item.pumpNumber) === String(pumpNumber)
+      );
+
+      if (idx >= 0) {
+        updated[idx] = {
+          pumpNumber: String(pumpNumber),
+          returnedToPharmacy: true,
+        };
+      } else {
+        updated.push({
+          pumpNumber: String(pumpNumber),
+          returnedToPharmacy: true,
+        });
+      }
+
+      await updateDoc(doc(db, "orders", order.id), {
+        previousPumpsReturnToPharmacy: updated,
+        statusUpdatedAt: serverTimestamp(),
+      });
+
+      const pumpQuery = query(
+        collection(db, "pumps"),
+        where("pharmacyId", "==", pharmacyId),
+        where("pumpNumber", "==", String(pumpNumber))
+      );
+
+      const pumpSnap = await getDocs(pumpQuery);
+      if (!pumpSnap.empty) {
+        const pumpDoc = pumpSnap.docs[0];
+        await updateDoc(doc(db, "pumps", pumpDoc.id), {
+          maintenanceDue: true,
+          maintenanceDueAt: serverTimestamp(),
+          maintenanceStatus: {
+            cleaned: false,
+            calibrated: false,
+            inspected: false,
+          },
+        });
+      }
+
+      setInfo("Return confirmed.");
+      setTimeout(() => setInfo(""), 4000);
+    } catch (err) {
+      console.error("handleConfirmReturn error:", err);
+      setError("Failed to confirm return.");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
       <div className="w-full max-w-4xl space-y-8">
@@ -89,14 +216,53 @@ export default function PumpReturnsPage() {
           </p>
         </div>
 
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        {info && <p className="text-green-400 text-sm text-center">{info}</p>}
+
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter("all")}
+            className={`text-xs px-3 py-1 rounded border ${
+              filter === "all"
+                ? "bg-white/20 border-white/30"
+                : "bg-black/30 border-white/10"
+            }`}
+          >
+            All ({counts.all})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter("pending")}
+            className={`text-xs px-3 py-1 rounded border ${
+              filter === "pending"
+                ? "bg-amber-500/20 border-amber-400/40"
+                : "bg-black/30 border-white/10"
+            }`}
+          >
+            Pending ({counts.pending})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter("returned")}
+            className={`text-xs px-3 py-1 rounded border ${
+              filter === "returned"
+                ? "bg-emerald-500/20 border-emerald-400/40"
+                : "bg-black/30 border-white/10"
+            }`}
+          >
+            Returned ({counts.returned})
+          </button>
+        </div>
+
         <div className="space-y-4">
-          {orders.length === 0 && (
+          {filteredOrders.length === 0 && (
             <p className="text-sm text-white/60 text-center">
               No return records yet.
             </p>
           )}
 
-          {orders.map((o) => (
+          {filteredOrders.map((o) => (
             <div
               key={o.id}
               className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-2"
@@ -134,6 +300,25 @@ export default function PumpReturnsPage() {
                           <p className="text-xs text-white/80">
                             Reason: {entry.reason || "—"}
                           </p>
+                        )}
+
+                        {entry.returned && (
+                          <div className="mt-2">
+                            {isPumpReturnedToPharmacy(o, entry.pumpNumber) ? (
+                              <p className="text-xs text-green-400">
+                                Returned to pharmacy
+                              </p>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={loadingId === `${o.id}-${entry.pumpNumber}`}
+                                onClick={() => handleConfirmReturn(o, entry.pumpNumber)}
+                                className="text-xs px-3 py-1 bg-amber-600 rounded disabled:opacity-50"
+                              >
+                                Mark returned to pharmacy
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}
