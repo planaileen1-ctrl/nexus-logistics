@@ -146,17 +146,17 @@ export default function EmployeeDashboardPage() {
 
           {/* ORDERS */}
           <button
-            onClick={() => router.push("/employee/orders")}
+            onClick={() => router.push("/employee/orders?view=create")}
             className="group cursor-pointer bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/40 hover:border-amber-400/80
                        rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-amber-500/20"
           >
             <div className="space-y-4">
               <div className="text-amber-300 text-4xl group-hover:scale-110 transition-transform">📦</div>
               <div className="space-y-2">
-                <h2 className="text-lg font-bold group-hover:text-amber-100 transition">Orders</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Create delivery orders and assign them to drivers by location.</p>
+                <h2 className="text-lg font-bold group-hover:text-amber-100 transition">New Shipping Orders</h2>
+                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Write and create new delivery orders by customer, pump, and destination.</p>
               </div>
-              <p className="text-xs text-amber-400 font-semibold">Go to order management →</p>
+              <p className="text-xs text-amber-400 font-semibold">Create a new order →</p>
             </div>
           </button>
 
@@ -208,7 +208,7 @@ export default function EmployeeDashboardPage() {
             </div>
           </button>
 
-          {/* DRIVER ACTIVITY */}
+          {/* ORDERS ACTIVITY */}
           <button
             onClick={() => router.push("/employee/orders?view=activity")}
             className="group cursor-pointer bg-gradient-to-br from-cyan-500/15 to-cyan-600/5 border border-cyan-500/40 hover:border-cyan-400/80
@@ -217,26 +217,10 @@ export default function EmployeeDashboardPage() {
             <div className="space-y-4">
               <div className="text-cyan-300 text-4xl group-hover:scale-110 transition-transform">🚚</div>
               <div className="space-y-2">
-                <h2 className="text-lg font-bold group-hover:text-cyan-100 transition">Driver Activity</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Live updates on driver deliveries and operations across fleet.</p>
+                <h2 className="text-lg font-bold group-hover:text-cyan-100 transition">Orders Activity</h2>
+                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Track created orders and every driver status update from assignment to delivery.</p>
               </div>
-              <p className="text-xs text-cyan-400 font-semibold">View activity feed →</p>
-            </div>
-          </button>
-
-          {/* ORDER SEARCH */}
-          <button
-            onClick={() => router.push("/employee/orders?view=orders")}
-            className="group cursor-pointer bg-gradient-to-br from-purple-500/15 to-purple-600/5 border border-purple-500/40 hover:border-purple-400/80
-                       rounded-2xl p-6 transition-all duration-300 hover:scale-[1.03] hover:shadow-lg hover:shadow-purple-500/20"
-          >
-            <div className="space-y-4">
-              <div className="text-purple-300 text-4xl group-hover:scale-110 transition-transform">🔍</div>
-              <div className="space-y-2">
-                <h2 className="text-lg font-bold group-hover:text-purple-100 transition">Order Search</h2>
-                <p className="text-sm text-slate-400 group-hover:text-slate-300 transition">Search orders by customer name or pump number quickly.</p>
-              </div>
-              <p className="text-xs text-purple-400 font-semibold">Open search view →</p>
+              <p className="text-xs text-cyan-400 font-semibold">View orders activity →</p>
             </div>
           </button>
 

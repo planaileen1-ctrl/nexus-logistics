@@ -12,7 +12,7 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   collection,
   addDoc,
@@ -45,9 +45,26 @@ type Customer = {
   returnReminderNote?: string;
 };
 
+type ActivityOrder = {
+  id: string;
+  status: string;
+  customerName?: string;
+  customerCity?: string;
+  pumpNumbers?: string[];
+  driverName?: string;
+  createdByEmployeeName?: string;
+  createdAt?: any;
+  assignedAt?: any;
+  startedAt?: any;
+  arrivedAt?: any;
+  deliveredAt?: any;
+  statusUpdatedAt?: any;
+};
+
 /* ---------- Helpers ---------- */
 export default function EmployeeOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   /* ---------- Context ---------- */
   const pharmacyId =
@@ -86,6 +103,11 @@ export default function EmployeeOrdersPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const pumpSearchRef = useRef<HTMLInputElement>(null);
+  const [activityOrders, setActivityOrders] = useState<ActivityOrder[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityStatusFilter, setActivityStatusFilter] = useState<"ALL" | "ACTIVE" | "DELIVERED">("ALL");
+
+  const currentView = searchParams.get("view") === "activity" ? "activity" : "create";
 
   /* ---------- Init ---------- */
   useEffect(() => {
@@ -110,6 +132,11 @@ export default function EmployeeOrdersPage() {
 
     loadCustomerPreviousPumps(customerId);
   }, [customerId]);
+
+  useEffect(() => {
+    if (currentView !== "activity") return;
+    loadOrdersActivity();
+  }, [currentView, pharmacyId]);
 
   /* ---------- Loaders ---------- */
   async function loadPumps() {
@@ -186,6 +213,120 @@ export default function EmployeeOrdersPage() {
       setCustomerPreviousPumps([]);
     } finally {
       setCustomerPumpsLoading(false);
+    }
+  }
+
+  function timestampToMillis(ts: any) {
+    if (!ts) return 0;
+    if (typeof ts === "string") return new Date(ts).getTime();
+    if (ts?.toDate) return ts.toDate().getTime();
+    if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+    return 0;
+  }
+
+  function formatTimestamp(ts: any) {
+    if (!ts) return "—";
+    if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
+    if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
+    if (typeof ts?.seconds === "number") return new Date(ts.seconds * 1000).toLocaleString("en-US");
+    return "—";
+  }
+
+  function getStatusMeta(rawStatus?: string) {
+    const status = String(rawStatus || "PENDING").trim().toUpperCase();
+
+    const statusMap: Record<string, { label: string; className: string }> = {
+      PENDING: {
+        label: "Pending",
+        className: "bg-amber-500/20 text-amber-300 border border-amber-500/40",
+      },
+      ASSIGNED: {
+        label: "Assigned",
+        className: "bg-blue-500/20 text-blue-300 border border-blue-500/40",
+      },
+      IN_PROGRESS: {
+        label: "In Progress",
+        className: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40",
+      },
+      ON_WAY_TO_PHARMACY: {
+        label: "On the way to Pharmacy",
+        className: "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40",
+      },
+      ON_WAY_TO_CUSTOMER: {
+        label: "On the way to Customer",
+        className: "bg-teal-500/20 text-teal-300 border border-teal-500/40",
+      },
+      DELIVERED: {
+        label: "Delivered",
+        className: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40",
+      },
+      CANCELLED: {
+        label: "Cancelled",
+        className: "bg-rose-500/20 text-rose-300 border border-rose-500/40",
+      },
+    };
+
+    return statusMap[status] || {
+      label: status,
+      className: "bg-white/10 text-white/80 border border-white/20",
+    };
+  }
+
+  const filteredActivityOrders = activityOrders.filter((order) => {
+    const status = String(order.status || "PENDING").trim().toUpperCase();
+
+    if (activityStatusFilter === "DELIVERED") {
+      return status === "DELIVERED";
+    }
+
+    if (activityStatusFilter === "ACTIVE") {
+      return status !== "DELIVERED" && status !== "CANCELLED";
+    }
+
+    return true;
+  });
+
+  const allActivityCount = activityOrders.length;
+  const activeActivityCount = activityOrders.filter((order) => {
+    const status = String(order.status || "PENDING").trim().toUpperCase();
+    return status !== "DELIVERED" && status !== "CANCELLED";
+  }).length;
+  const deliveredActivityCount = activityOrders.filter((order) => {
+    const status = String(order.status || "PENDING").trim().toUpperCase();
+    return status === "DELIVERED";
+  }).length;
+
+  async function loadOrdersActivity() {
+    if (!pharmacyId) {
+      setError("Missing pharmacy context");
+      return;
+    }
+
+    setActivityLoading(true);
+    try {
+      const q = query(
+        collection(db, "orders"),
+        where("pharmacyId", "==", pharmacyId)
+      );
+
+      const snap = await getDocs(q);
+      const list = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as any),
+      })) as ActivityOrder[];
+
+      list.sort((a, b) => {
+        const aTime = timestampToMillis(a.createdAt) || timestampToMillis(a.statusUpdatedAt);
+        const bTime = timestampToMillis(b.createdAt) || timestampToMillis(b.statusUpdatedAt);
+        return bTime - aTime;
+      });
+
+      setActivityOrders(list);
+    } catch (err) {
+      console.error("loadOrdersActivity error:", err);
+      setError("Failed to load orders activity");
+    } finally {
+      setActivityLoading(false);
     }
   }
 
@@ -414,11 +555,38 @@ export default function EmployeeOrdersPage() {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Orders</h1>
           <p className="text-sm text-white/60">
-            Create and manage delivery orders
+            {currentView === "activity"
+              ? "Track all created orders and driver progress"
+              : "Create and manage delivery orders"}
           </p>
         </div>
 
-        {/* CREATE ORDER */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => router.replace("/employee/orders?view=create")}
+            className={`rounded-lg py-2 text-sm font-semibold border transition-colors ${
+              currentView === "create"
+                ? "bg-indigo-600 border-indigo-500 text-white"
+                : "bg-black/30 border-white/10 text-white/70 hover:text-white"
+            }`}
+          >
+            New Shipping Order
+          </button>
+          <button
+            type="button"
+            onClick={() => router.replace("/employee/orders?view=activity")}
+            className={`rounded-lg py-2 text-sm font-semibold border transition-colors ${
+              currentView === "activity"
+                ? "bg-cyan-600 border-cyan-500 text-white"
+                : "bg-black/30 border-white/10 text-white/70 hover:text-white"
+            }`}
+          >
+            Orders Activity
+          </button>
+        </div>
+
+        {currentView === "create" && (
         <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
           <h2 className="font-semibold">Create New Order</h2>
 
@@ -584,6 +752,106 @@ export default function EmployeeOrdersPage() {
             {loading ? "CREATING..." : "CREATE ORDER"}
           </button>
         </div>
+        )}
+
+        {currentView === "activity" && (
+          <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">Orders Activity Feed</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActivityStatusFilter("ALL")}
+                  className={`text-xs px-3 py-1 rounded border ${
+                    activityStatusFilter === "ALL"
+                      ? "bg-white/15 border-white/40"
+                      : "border-white/20 hover:border-white/40"
+                  }`}
+                >
+                  All ({allActivityCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityStatusFilter("ACTIVE")}
+                  className={`text-xs px-3 py-1 rounded border ${
+                    activityStatusFilter === "ACTIVE"
+                      ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-200"
+                      : "border-white/20 hover:border-white/40"
+                  }`}
+                >
+                  Active ({activeActivityCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityStatusFilter("DELIVERED")}
+                  className={`text-xs px-3 py-1 rounded border ${
+                    activityStatusFilter === "DELIVERED"
+                      ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-200"
+                      : "border-white/20 hover:border-white/40"
+                  }`}
+                >
+                  Delivered ({deliveredActivityCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={loadOrdersActivity}
+                  className="text-xs px-3 py-1 rounded border border-white/20 hover:border-white/40"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {activityLoading && (
+              <p className="text-sm text-white/60">Loading orders activity...</p>
+            )}
+
+            {!activityLoading && filteredActivityOrders.length === 0 && (
+              <p className="text-sm text-white/60">No orders created yet.</p>
+            )}
+
+            {!activityLoading && filteredActivityOrders.length > 0 && (
+              <div className="space-y-3">
+                {filteredActivityOrders.map((o) => (
+                  <div key={o.id} className="border border-white/10 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">Order #{o.id.slice(0, 8)}</p>
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${getStatusMeta(o.status).className}`}
+                      >
+                        {getStatusMeta(o.status).label}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-white/70">
+                      Customer: {o.customerName || "—"}
+                      {o.customerCity ? ` (${o.customerCity})` : ""}
+                    </p>
+
+                    <p className="text-xs text-white/60">
+                      Pumps: {o.pumpNumbers && o.pumpNumbers.length > 0 ? o.pumpNumbers.join(", ") : "—"}
+                    </p>
+
+                    <p className="text-xs text-white/60">
+                      Driver: {o.driverName || "Not assigned yet"}
+                    </p>
+
+                    <p className="text-xs text-white/60">
+                      Created by: {o.createdByEmployeeName || "—"}
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-white/50">
+                      <p>Created: {formatTimestamp(o.createdAt)}</p>
+                      <p>Assigned: {formatTimestamp(o.assignedAt)}</p>
+                      <p>Arrived: {formatTimestamp(o.arrivedAt)}</p>
+                      <p>Delivered: {formatTimestamp(o.deliveredAt)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="text-center">
           <button
