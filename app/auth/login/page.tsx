@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
@@ -23,12 +23,22 @@ export default function LoginPage() {
 
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [isValidating, setIsValidating] = useState(false);
+  const validatingRef = useRef(false);
+
+  useEffect(() => {
+    void ensureAnonymousAuth();
+  }, []);
 
   /* =====================
      HANDLE KEYPAD
   ===================== */
 
   const handlePress = (value: string) => {
+    if (validatingRef.current) {
+      return;
+    }
+
     if (value === "C") {
       setPin("");
       setError("");
@@ -37,7 +47,7 @@ export default function LoginPage() {
 
     if (value === "OK") {
       if (pin.length === 4) {
-        validatePin();
+        validatePin(pin);
       }
       return;
     }
@@ -57,6 +67,14 @@ export default function LoginPage() {
 
   const validatePin = async (overridePin?: string) => {
     const activePin = overridePin || pin;
+
+    if (activePin.length !== 4 || validatingRef.current) {
+      return;
+    }
+
+    validatingRef.current = true;
+    setIsValidating(true);
+
     try {
       await ensureAnonymousAuth();
 
@@ -74,7 +92,23 @@ export default function LoginPage() {
         where("active", "==", true)
       );
 
-      const pharmacySnap = await getDocs(pharmacyQuery);
+      const employeeQuery = query(
+        collection(db, "employees"),
+        where("pin", "==", activePin),
+        where("active", "==", true)
+      );
+
+      const driverQuery = query(
+        collection(db, "drivers"),
+        where("pin", "==", activePin),
+        where("active", "==", true)
+      );
+
+      const [pharmacySnap, employeeSnap, driverSnap] = await Promise.all([
+        getDocs(pharmacyQuery),
+        getDocs(employeeQuery),
+        getDocs(driverQuery),
+      ]);
 
       if (!pharmacySnap.empty) {
         const pharmacyDoc = pharmacySnap.docs[0];
@@ -92,14 +126,6 @@ export default function LoginPage() {
       }
 
       // 3️⃣ EMPLOYEE  ✅ BLINDED HERE
-      const employeeQuery = query(
-        collection(db, "employees"),
-        where("pin", "==", activePin),
-        where("active", "==", true)
-      );
-
-      const employeeSnap = await getDocs(employeeQuery);
-
       if (!employeeSnap.empty) {
         const employeeDoc = employeeSnap.docs[0];
         const employee = employeeDoc.data();
@@ -122,14 +148,6 @@ export default function LoginPage() {
       }
 
       // 4️⃣ DRIVER
-      const driverQuery = query(
-        collection(db, "drivers"),
-        where("pin", "==", activePin),
-        where("active", "==", true)
-      );
-
-      const driverSnap = await getDocs(driverQuery);
-
       if (!driverSnap.empty) {
         const driverDoc = driverSnap.docs[0];
         const driver = driverDoc.data();
@@ -148,6 +166,9 @@ export default function LoginPage() {
       console.error(err);
       setError("LOGIN ERROR");
       setPin("");
+    } finally {
+      validatingRef.current = false;
+      setIsValidating(false);
     }
   };
 
@@ -193,13 +214,20 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* VALIDATING MESSAGE */}
+        {isValidating && (
+          <div className="text-xs uppercase tracking-widest text-emerald-300/90 animate-pulse">
+            Verifying...
+          </div>
+        )}
+
         {/* KEYPAD */}
         <div className="grid grid-cols-3 gap-3 bg-gradient-to-br from-slate-800/50 to-slate-900/50 p-7 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
           {["1","2","3","4","5","6","7","8","9","C","0","OK"].map((key) => (
             <button
               key={key}
               onClick={() => handlePress(key)}
-              disabled={key === "OK" && pin.length !== 4}
+              disabled={isValidating || (key === "OK" && pin.length !== 4)}
               className={`w-16 h-14 rounded-xl font-bold text-lg transition-all duration-200 ${
                 key === "C"
                   ? "bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30"
