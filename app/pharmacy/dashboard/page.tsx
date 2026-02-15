@@ -16,6 +16,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db, ensureAnonymousAuth } from "@/lib/firebase";
 import {
   LayoutDashboard,
+  Users,
   Search,
   Bell,
   LogOut,
@@ -345,6 +346,13 @@ export default function PharmacyDashboardPage() {
           <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-500/15 border border-blue-500/25 text-blue-300">
             <LayoutDashboard size={18} />
             <span className="text-sm font-semibold">Dashboard</span>
+          </button>
+          <button
+            onClick={() => router.push("/pharmacy/employee-operations")}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:border-white/25"
+          >
+            <Users size={18} />
+            <span className="text-sm font-semibold">Employee Operation</span>
           </button>
         </nav>
 
