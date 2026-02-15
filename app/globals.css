@@ -49,3 +49,29 @@ input::placeholder,
 textarea::placeholder {
   text-transform: uppercase;
 }
+
+@keyframes heartbeatPulse {
+  0% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.03);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.03);
+  }
+  70% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.heartbeat-card {
+  animation: heartbeatPulse 1.6s ease-in-out infinite;
+  transform-origin: center;
+}

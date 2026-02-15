@@ -13,7 +13,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db, ensureAnonymousAuth } from "@/lib/firebase";
 
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
@@ -30,6 +31,9 @@ export default function EmployeeDashboardPage() {
   const [employeeName, setEmployeeName] = useState("");
   const [employeeEmail, setEmployeeEmail] = useState("");
   const [loginAt, setLoginAt] = useState("");
+  const [pumpOutCount, setPumpOutCount] = useState(0);
+  const [pumpOutOver20Count, setPumpOutOver20Count] = useState(0);
+  const [pumpOutOver30Count, setPumpOutOver30Count] = useState(0);
 
   useEffect(() => {
     const name = localStorage.getItem("EMPLOYEE_NAME") || "Unknown Employee";
@@ -47,6 +51,128 @@ export default function EmployeeDashboardPage() {
     setEmployeeName(name);
     setEmployeeEmail(email);
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await ensureAnonymousAuth();
+
+        const pharmacyId = localStorage.getItem("PHARMACY_ID");
+        if (!pharmacyId) {
+          setPumpOutCount(0);
+          setPumpOutOver20Count(0);
+          setPumpOutOver30Count(0);
+          return;
+        }
+
+        const snap = await getDocs(
+          query(collection(db, "orders"), where("pharmacyId", "==", pharmacyId))
+        );
+
+        const toMs = (ts: any) => {
+          if (!ts) return 0;
+          if (typeof ts === "string") return new Date(ts).getTime();
+          if (ts?.toDate) return ts.toDate().getTime();
+          if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+          return 0;
+        };
+
+        const orders = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as any) }))
+          .sort((a, b) => {
+            const aTime = toMs(a.deliveredAt) || toMs(a.deliveredAtISO) || toMs(a.createdAt);
+            const bTime = toMs(b.deliveredAt) || toMs(b.deliveredAtISO) || toMs(b.createdAt);
+            return aTime - bTime;
+          });
+
+        const byCustomer = new Map<string, Map<string, number>>();
+
+        orders.forEach((order: any) => {
+          const customerId = String(order.customerId || "").trim();
+          if (!customerId) return;
+
+          if (!byCustomer.has(customerId)) {
+            byCustomer.set(customerId, new Map<string, number>());
+          }
+
+          const pumpMap = byCustomer.get(customerId)!;
+          const rawStatus = String(order.status || "").trim().toUpperCase();
+          const isDelivered = rawStatus === "DELIVERED" || !!order.deliveredAt || !!order.deliveredAtISO;
+
+          if (isDelivered) {
+            const deliveredMs =
+              toMs(order.deliveredAt) ||
+              toMs(order.deliveredAtISO) ||
+              toMs(order.statusUpdatedAt) ||
+              toMs(order.createdAt);
+
+            (order.pumpNumbers || []).forEach((num: any) => {
+              const pumpNumber = String(num || "").trim();
+              if (pumpNumber) {
+                pumpMap.set(pumpNumber, deliveredMs);
+              }
+            });
+          }
+
+          (order.previousPumpsStatus || [])
+            .filter((entry: any) => entry.returned)
+            .forEach((entry: any) => {
+              const pumpNumber = String(entry.pumpNumber || "").trim();
+              if (pumpNumber) pumpMap.delete(pumpNumber);
+            });
+
+          if (order.previousPumpsReturned === true) {
+            (order.previousPumps || []).forEach((num: any) => {
+              const pumpNumber = String(num || "").trim();
+              if (pumpNumber) pumpMap.delete(pumpNumber);
+            });
+          }
+
+          (order.previousPumpsReturnToPharmacy || [])
+            .filter((entry: any) => entry.returnedToPharmacy)
+            .forEach((entry: any) => {
+              const pumpNumber = String(entry.pumpNumber || "").trim();
+              if (pumpNumber) pumpMap.delete(pumpNumber);
+            });
+        });
+
+        const total = Array.from(byCustomer.values()).reduce(
+          (count, pumpMap) => count + pumpMap.size,
+          0
+        );
+
+        const now = Date.now();
+        const dayMs = 1000 * 60 * 60 * 24;
+        let over20 = 0;
+        let over30 = 0;
+
+        byCustomer.forEach((pumpMap) => {
+          pumpMap.forEach((deliveredMs) => {
+            const daysOut = deliveredMs > 0 ? Math.floor((now - deliveredMs) / dayMs) : 0;
+
+            if (daysOut >= 20) over20 += 1;
+            if (daysOut >= 30) over30 += 1;
+          });
+        });
+
+        setPumpOutCount(total);
+        setPumpOutOver20Count(over20);
+        setPumpOutOver30Count(over30);
+      } catch (err) {
+        console.error("Failed to load pump out count:", err);
+        setPumpOutCount(0);
+        setPumpOutOver20Count(0);
+        setPumpOutOver30Count(0);
+      }
+    })();
+  }, []);
+
+  const pumpOutBadgeClass =
+    pumpOutOver30Count > 0
+      ? "bg-red-600 border-red-400/70 shadow-red-900/40"
+      : pumpOutOver20Count > 0
+      ? "bg-yellow-500 border-yellow-300/70 shadow-yellow-900/30 text-black"
+      : "bg-blue-600 border-blue-400/70 shadow-blue-900/40";
 
   const handleLogout = async () => {
     try {
@@ -168,9 +294,16 @@ export default function EmployeeDashboardPage() {
           {/* RETURN REMINDERS */}
           <button
             onClick={() => router.push("/employee/pumps-manager")}
-            className="group cursor-pointer bg-gradient-to-br from-blue-500/15 to-blue-600/5 border border-blue-500/40 hover:border-blue-400/80
-                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20"
+            className={`group cursor-pointer bg-gradient-to-br from-blue-500/15 to-blue-600/5 border border-blue-500/40 hover:border-blue-400/80
+                       rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-blue-500/20 relative ${
+                         pumpOutCount > 0 ? "heartbeat-card" : ""
+                       }`}
           >
+            {pumpOutCount > 0 && (
+              <span className={`absolute top-2 right-2 min-w-6 h-6 px-1 rounded-full text-white text-xs font-bold inline-flex items-center justify-center border shadow-lg ${pumpOutBadgeClass}`}>
+                {pumpOutCount}
+              </span>
+            )}
             <div className="space-y-4">
               <div className="text-blue-300 text-4xl group-hover:scale-110 transition-transform">🧪</div>
               <div className="space-y-2">
