@@ -6,6 +6,16 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { sendAppEmail } from "@/lib/emailClient";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 type DeliveryBackup = {
   id: string;
   customerName?: string;
@@ -20,8 +30,8 @@ type DeliveryBackup = {
 
 function formatDate(ts: any) {
   if (!ts) return "—";
-  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
-  if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
+  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US", DATE_TIME_FORMAT);
+  if (ts?.toDate) return ts.toDate().toLocaleString("en-US", DATE_TIME_FORMAT);
   return "—";
 }
 

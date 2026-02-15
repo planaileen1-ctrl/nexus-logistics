@@ -244,17 +244,62 @@ export default function EmployeeOrdersPage() {
       );
 
       const snap = await getDocs(q);
-      const pumpSet = new Set<string>();
+      const orders = snap.docs
+        .map((d) => ({ id: d.id, ...(d.data() as any) }))
+        .sort((a: any, b: any) => {
+          const toMs = (ts: any) => {
+            if (!ts) return 0;
+            if (typeof ts === "string") return new Date(ts).getTime();
+            if (ts?.toDate) return ts.toDate().getTime();
+            if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+            return 0;
+          };
 
-      snap.docs.forEach((d) => {
-        const data = d.data() as any;
-        const numbers = (data.pumpNumbers || []) as any[];
-        numbers.forEach((num) => {
-          if (num) pumpSet.add(String(num));
+          const aTime = toMs(a.deliveredAt) || toMs(a.deliveredAtISO) || toMs(a.createdAt);
+          const bTime = toMs(b.deliveredAt) || toMs(b.deliveredAtISO) || toMs(b.createdAt);
+          return aTime - bTime;
         });
+
+      const pendingPumps = new Set<string>();
+
+      orders.forEach((order: any) => {
+        const rawStatus = String(order.status || "").trim().toUpperCase();
+        const isDelivered = rawStatus === "DELIVERED" || !!order.deliveredAt || !!order.deliveredAtISO;
+
+        if (isDelivered) {
+          const deliveredNumbers = (order.pumpNumbers || []) as any[];
+          deliveredNumbers.forEach((num) => {
+            const pumpNumber = String(num || "").trim();
+            if (pumpNumber) pendingPumps.add(pumpNumber);
+          });
+        }
+
+        const previousStatus = (order.previousPumpsStatus || []) as any[];
+        previousStatus
+          .filter((entry) => entry?.returned === true)
+          .forEach((entry) => {
+            const pumpNumber = String(entry?.pumpNumber || "").trim();
+            if (pumpNumber) pendingPumps.delete(pumpNumber);
+          });
+
+        const returnToPharmacy = (order.previousPumpsReturnToPharmacy || []) as any[];
+        returnToPharmacy.forEach((entry) => {
+          const pumpNumber = String(entry?.pumpNumber || "").trim();
+          if (pumpNumber) pendingPumps.delete(pumpNumber);
+        });
+
+        const legacyPrevious = (order.previousPumps || []) as any[];
+        if (order.previousPumpsReturned === true && legacyPrevious.length > 0) {
+          legacyPrevious.forEach((num) => {
+            const pumpNumber = String(num || "").trim();
+            if (pumpNumber) pendingPumps.delete(pumpNumber);
+          });
+        }
       });
 
-      setCustomerPreviousPumps(Array.from(pumpSet));
+      const finalPending = Array.from(pendingPumps).sort((a, b) => a.localeCompare(b));
+
+      setCustomerPreviousPumps(finalPending);
     } catch (err) {
       console.error("loadCustomerPreviousPumps error:", err);
       setCustomerPreviousPumps([]);
@@ -271,11 +316,21 @@ export default function EmployeeOrdersPage() {
     return 0;
   }
 
+  const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  };
+
   function formatTimestamp(ts: any) {
     if (!ts) return "—";
-    if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
-    if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
-    if (typeof ts?.seconds === "number") return new Date(ts.seconds * 1000).toLocaleString("en-US");
+    if (typeof ts === "string") return new Date(ts).toLocaleString("en-US", DATE_TIME_FORMAT);
+    if (ts?.toDate) return ts.toDate().toLocaleString("en-US", DATE_TIME_FORMAT);
+    if (typeof ts?.seconds === "number") return new Date(ts.seconds * 1000).toLocaleString("en-US", DATE_TIME_FORMAT);
     return "—";
   }
 

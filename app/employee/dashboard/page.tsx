@@ -15,6 +15,16 @@ import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 export default function EmployeeDashboardPage() {
   const router = useRouter();
   const [employeeName, setEmployeeName] = useState("");
@@ -60,10 +70,7 @@ export default function EmployeeDashboardPage() {
   };
 
   const formattedLoginAt = loginAt
-    ? new Date(loginAt).toLocaleString("en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
+    ? new Date(loginAt).toLocaleString("en-US", DATE_TIME_FORMAT)
     : "--";
 
   return (
@@ -167,9 +174,9 @@ export default function EmployeeDashboardPage() {
             <div className="space-y-4">
               <div className="text-blue-300 text-4xl group-hover:scale-110 transition-transform">🧪</div>
               <div className="space-y-2">
-                <h2 className="text-lg font-bold group-hover:text-blue-100 transition">Return Reminders</h2>
+                <h2 className="text-lg font-bold group-hover:text-blue-100 transition">Pump Out (Clients)</h2>
               </div>
-              <p className="text-xs text-blue-400 font-semibold">Open reminders →</p>
+              <p className="text-xs text-blue-400 font-semibold">Open pending client pumps →</p>
             </div>
           </button>
 

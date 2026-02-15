@@ -20,6 +20,16 @@ import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import SignaturePad from "@/components/SignaturePad";
 import { sendAppEmail } from "@/lib/emailClient";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 const COUNTRIES = {
   ECUADOR: [
     "AZUAY","BOLIVAR","CAÑAR","CARCHI","CHIMBORAZO","COTOPAXI","EL ORO",
@@ -83,7 +93,7 @@ export default function RegisterDriverPage() {
         createdAt: serverTimestamp(),
       });
 
-      const sentAt = new Date().toLocaleString("en-US");
+      const sentAt = new Date().toLocaleString("en-US", DATE_TIME_FORMAT);
       await sendAppEmail({
         to: email,
         subject: "Your Driver Login PIN",
@@ -117,7 +127,7 @@ export default function RegisterDriverPage() {
 
           <p className="text-sm text-slate-400">Registration Date (USA)</p>
           <p className="text-indigo-400 mb-4">
-            {new Date().toLocaleString("en-US")}
+            {new Date().toLocaleString("en-US", DATE_TIME_FORMAT)}
           </p>
 
           <p>Your login PIN is:</p>

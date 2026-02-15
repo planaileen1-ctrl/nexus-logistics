@@ -25,6 +25,16 @@ import {
 } from "@/lib/licenses";
 import { sendAppEmail } from "@/lib/emailClient";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 type License = {
   id: string;
   code: string;
@@ -75,7 +85,7 @@ export default function AdminPage() {
 
     const result = await createLicense(email);
 
-    const sentAt = new Date().toLocaleString("en-US");
+    const sentAt = new Date().toLocaleString("en-US", DATE_TIME_FORMAT);
     await sendAppEmail({
       to: email,
       subject: "Your Nexus License Code",

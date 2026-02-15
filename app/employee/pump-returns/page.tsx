@@ -24,6 +24,16 @@ import {
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { normalizePumpScannerInput } from "@/lib/pumpScanner";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 type ReturnOrder = {
   id: string;
   customerName: string;
@@ -46,8 +56,8 @@ type ReturnOrder = {
 
 function formatDate(ts: any) {
   if (!ts) return "—";
-  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US");
-  if (ts?.toDate) return ts.toDate().toLocaleString("en-US");
+  if (typeof ts === "string") return new Date(ts).toLocaleString("en-US", DATE_TIME_FORMAT);
+  if (ts?.toDate) return ts.toDate().toLocaleString("en-US", DATE_TIME_FORMAT);
   return "—";
 }
 
@@ -178,13 +188,16 @@ export default function PumpReturnsPage() {
   const filteredOrders = filteredByPump.filter((order) => {
     if (filter === "all") return true;
 
-    const pumps = order.previousPumpsStatus || [];
-    if (pumps.length === 0) return false;
+    const customerReturnedPumps = (order.previousPumpsStatus || []).filter(
+      (entry) => entry.returned
+    );
 
-    const allReturned = pumps.every((entry) =>
+    if (customerReturnedPumps.length === 0) return false;
+
+    const allReturned = customerReturnedPumps.every((entry) =>
       isPumpReturnedToPharmacy(order, entry.pumpNumber)
     );
-    const anyPending = pumps.some(
+    const anyPending = customerReturnedPumps.some(
       (entry) => !isPumpReturnedToPharmacy(order, entry.pumpNumber)
     );
 
@@ -195,14 +208,26 @@ export default function PumpReturnsPage() {
   const counts = {
     all: sortedOrders.length,
     pending: sortedOrders.filter((order) => {
-      const pumps = order.previousPumpsStatus || [];
-      if (pumps.length === 0) return false;
-      return pumps.some((entry) => !isPumpReturnedToPharmacy(order, entry.pumpNumber));
+      const customerReturnedPumps = (order.previousPumpsStatus || []).filter(
+        (entry) => entry.returned
+      );
+
+      if (customerReturnedPumps.length === 0) return false;
+
+      return customerReturnedPumps.some(
+        (entry) => !isPumpReturnedToPharmacy(order, entry.pumpNumber)
+      );
     }).length,
     returned: sortedOrders.filter((order) => {
-      const pumps = order.previousPumpsStatus || [];
-      if (pumps.length === 0) return false;
-      return pumps.every((entry) => isPumpReturnedToPharmacy(order, entry.pumpNumber));
+      const customerReturnedPumps = (order.previousPumpsStatus || []).filter(
+        (entry) => entry.returned
+      );
+
+      if (customerReturnedPumps.length === 0) return false;
+
+      return customerReturnedPumps.every((entry) =>
+        isPumpReturnedToPharmacy(order, entry.pumpNumber)
+      );
     }).length,
   };
 

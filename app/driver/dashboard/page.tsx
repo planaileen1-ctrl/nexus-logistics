@@ -126,6 +126,20 @@ async function getClientIpWithTimeout(timeoutMs = 1200): Promise<string> {
   }
 }
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
+function formatDateTime(value: string | number | Date) {
+  return new Date(value).toLocaleString("en-US", DATE_TIME_FORMAT);
+}
+
 /* ---------- Signature Canvas ---------- */
 function SignatureCanvas({
   label,
@@ -237,6 +251,7 @@ export default function DriverDashboardPage() {
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [deliveryContextTimeISO, setDeliveryContextTimeISO] = useState("");
 
   const [driverSignature, setDriverSignature] = useState("");
   const [signature, setSignature] = useState<string | null>(null);
@@ -499,6 +514,7 @@ export default function DriverDashboardPage() {
   async function handleArrivedAtCustomer(order: Order) {
     setSelectedOrder(order);
     setShowDeliveryModal(true);
+    setDeliveryContextTimeISO(new Date().toISOString());
 
     const liveLocation = await getDriverCurrentLocation();
     const arrivedAtISO = new Date().toISOString();
@@ -517,7 +533,7 @@ export default function DriverDashboardPage() {
       });
 
       setDeliveryInfo(
-        `Arrival registered: ${new Date(arrivedAtISO).toLocaleString("en-US")}`
+        `Arrival registered: ${formatDateTime(arrivedAtISO)}`
       );
       setTimeout(() => setDeliveryInfo(""), 6000);
     } catch (err) {
@@ -693,7 +709,7 @@ export default function DriverDashboardPage() {
             const customerEmail = customerSnap.data()?.email as string | undefined;
 
             if (customerEmail) {
-              const sentAt = new Date().toLocaleString("en-US");
+              const sentAt = formatDateTime(new Date());
               const reasonsHtml = notReturnedList
                 .map(
                   (entry) =>
@@ -764,12 +780,13 @@ export default function DriverDashboardPage() {
     if (completed) {
       setShowDeliveryModal(false);
       setSelectedOrder(null);
+      setDeliveryContextTimeISO("");
       setSignature(null);
       setDriverSignature("");
       setReceiverName("");
       setPreviousPumpsStatus({});
       setDeliveryInfo(
-        `Delivery registered successfully at ${new Date().toLocaleString("en-US")}.`
+        `Delivery registered successfully at ${formatDateTime(new Date())}.`
       );
       setTimeout(() => setDeliveryInfo(""), 6000);
     }
@@ -978,7 +995,7 @@ export default function DriverDashboardPage() {
                     <>
                       {o.arrivedAtISO && (
                         <p className="text-xs text-white/60">
-                          Arrival: {new Date(o.arrivedAtISO).toLocaleString("en-US")}
+                          Arrival: {formatDateTime(o.arrivedAtISO)}
                         </p>
                       )}
                       <button
@@ -1149,6 +1166,18 @@ export default function DriverDashboardPage() {
               <p className="font-semibold">
                 Customer: {selectedOrder.customerName}
               </p>
+
+              <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-1">
+                <p className="text-xs text-white/80">
+                  Driver delivering: <span className="font-semibold text-white">{driverName || "UNKNOWN"}</span>
+                </p>
+                <p className="text-xs text-white/80">
+                  Pumps to deliver: <span className="font-semibold text-white">{selectedOrder.pumpNumbers.join(", ")}</span>
+                </p>
+                <p className="text-xs text-white/80">
+                  Delivery date/time: <span className="font-semibold text-white">{formatDateTime(deliveryContextTimeISO || new Date().toISOString())}</span>
+                </p>
+              </div>
 
               <div className="space-y-1">
                 <label className="text-xs text-white/70">Receiver Name</label>

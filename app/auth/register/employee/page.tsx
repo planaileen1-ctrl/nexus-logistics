@@ -20,6 +20,16 @@ import { sendAppEmail } from "@/lib/emailClient";
 import SignaturePad from "@/components/SignaturePad";
 import { saveEmployeeSignature } from "@/lib/signatures";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 export default function EmployeeRegisterPage() {
   const router = useRouter();
 
@@ -84,7 +94,7 @@ export default function EmployeeRegisterPage() {
         jobTitle // ✅ PASAMOS EL CARGO
       );
 
-      const sentAt = new Date().toLocaleString("en-US");
+      const sentAt = new Date().toLocaleString("en-US", DATE_TIME_FORMAT);
       await sendAppEmail({
         to: email,
         subject: "Your Employee Login PIN",
@@ -126,7 +136,7 @@ export default function EmployeeRegisterPage() {
           </p>
 
           <p className="text-indigo-400 mb-4">
-            {new Date().toLocaleString("en-US")}
+            {new Date().toLocaleString("en-US", DATE_TIME_FORMAT)}
           </p>
 
           <p className="mb-2">Your login PIN is:</p>

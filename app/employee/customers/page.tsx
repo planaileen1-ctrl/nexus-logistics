@@ -32,6 +32,16 @@ import {
 } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: true,
+};
+
 /* 🌍 Country / State lists */
 const COUNTRIES = {
   ECUADOR: [
@@ -58,7 +68,7 @@ type CountryKey = keyof typeof COUNTRIES;
 /* 🔹 Date formatter */
 function formatDate(ts: any) {
   if (!ts?.toDate) return "—";
-  return ts.toDate().toLocaleString("en-US");
+  return ts.toDate().toLocaleString("en-US", DATE_TIME_FORMAT);
 }
 
 type Customer = {
