@@ -906,50 +906,6 @@ export default function DriverDashboardPage() {
           })
         );
 
-        const returnedPreviousPumpNumbers = previousPumpsStatusList
-          .filter((entry) => entry.returned)
-          .map((entry) => String(entry.pumpNumber).trim())
-          .filter(Boolean);
-
-        await Promise.all(
-          returnedPreviousPumpNumbers.map(async (pumpNumber) => {
-            const q = query(
-              collection(db, "pumps"),
-              where("pumpNumber", "==", pumpNumber),
-              where("pharmacyId", "==", order.pharmacyId)
-            );
-
-            const snap = await getDocs(q);
-
-            if (!snap.empty) {
-              const pumpDoc = snap.docs[0];
-
-              await updateDoc(doc(db, "pumps", pumpDoc.id), {
-                status: "IN_MAINTENANCE",
-                maintenanceDue: true,
-                maintenanceDueAt: serverTimestamp(),
-                maintenanceUpdatedAt: serverTimestamp(),
-                maintenanceCompletedAt: null,
-                maintenanceStatus: {
-                  cleaned: false,
-                  calibrated: false,
-                  inspected: false,
-                },
-              });
-
-              await logPumpMovement({
-                pumpId: pumpDoc.id,
-                pumpNumber,
-                pharmacyId: order.pharmacyId,
-                orderId: order.id,
-                action: "RETURNED",
-                performedById: driverId!,
-                performedByName: driverName!,
-                role: "DRIVER",
-              });
-            }
-          })
-        );
       })();
     } catch (err) {
       console.error("handleCompleteDelivery error:", err);
