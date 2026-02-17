@@ -279,6 +279,8 @@ export default function DriverDashboardPage() {
   const [connectedPharmacies, setConnectedPharmacies] = useState<Pharmacy[]>([]);
   const [availableOrders, setAvailableOrders] = useState<Order[]>([]);
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  // Unique active orders (remove duplicates by id)
+  const uniqueActiveOrders = getUniqueActiveOrders(activeOrders);
   const [returnTasks, setReturnTasks] = useState<
     { orderId: string; customerName: string; pumps: string[] }[]
   >([]);
@@ -884,44 +886,6 @@ export default function DriverDashboardPage() {
             );
 
             const snap = await getDocs(q);
-
-
-        const returnedPreviousPumpNumbers = previousPumpsStatusList
-          .filter((entry) => entry.returned)
-          .map((entry) => String(entry.pumpNumber).trim())
-          .filter(Boolean);
-
-        await Promise.all(
-          returnedPreviousPumpNumbers.map(async (pumpNumber) => {
-            const q = query(
-              collection(db, "pumps"),
-              where("pumpNumber", "==", pumpNumber),
-              where("pharmacyId", "==", order.pharmacyId)
-            );
-
-            const snap = await getDocs(q);
-            if (snap.empty) return;
-
-            const pumpDoc = snap.docs[0];
-
-            await updateDoc(doc(db, "pumps", pumpDoc.id), {
-              status: "RETURN_IN_TRANSIT",
-              maintenanceDue: false,
-              maintenanceDueAt: null,
-            });
-
-            await logPumpMovement({
-              pumpId: pumpDoc.id,
-              pumpNumber,
-              pharmacyId: order.pharmacyId,
-              orderId: order.id,
-              action: "RETURNED",
-              performedById: driverId!,
-              performedByName: driverName!,
-              role: "DRIVER",
-            });
-          })
-        );
             if (!snap.empty) {
               const pumpDoc = snap.docs[0];
 
@@ -1145,11 +1109,11 @@ export default function DriverDashboardPage() {
               <Truck size={16} />
               My Active Orders
             </h2>
-            {activeOrders.length === 0 && (
+            {uniqueActiveOrders.length === 0 && (
               <p className="text-xs text-white/60">No active orders.</p>
             )}
             <ul className="space-y-3">
-              {activeOrders.map((o) => (
+              {uniqueActiveOrders.map((o) => (
                 <li
                   key={o.id}
                   className="border border-green-500/30 rounded p-4 space-y-2"
@@ -1489,4 +1453,9 @@ export default function DriverDashboardPage() {
       </div>
     </main>
   );
+}
+
+// Filtrar órdenes activas para evitar duplicados por order.id
+export function getUniqueActiveOrders(activeOrders: Order[]): Order[] {
+  return Array.from(new Map(activeOrders.map((o) => [o.id, o])).values());
 }
