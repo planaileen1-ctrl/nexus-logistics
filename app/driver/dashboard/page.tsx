@@ -302,9 +302,16 @@ export default function DriverDashboardPage() {
   const [deliveryError, setDeliveryError] = useState("");
   const [deliveryInfo, setDeliveryInfo] = useState("");
   const [acceptInfo, setAcceptInfo] = useState("");
+  const [lastTechnicalError, setLastTechnicalError] = useState("");
   const [dashboardSection, setDashboardSection] = useState<
     "home" | "active" | "returns" | "connect"
   >("home");
+
+  function registerTechnicalError(scope: string, err: unknown) {
+    const code = (err as any)?.code ? String((err as any).code) : "UNKNOWN";
+    const message = (err as any)?.message ? String((err as any).message) : "No message";
+    setLastTechnicalError(`${scope}: ${code} — ${message}`);
+  }
 
   const pendingReturnPumpCount = returnTasks.reduce(
     (count, task) => count + task.pumps.length,
@@ -488,6 +495,7 @@ export default function DriverDashboardPage() {
       loadConnectedPharmacies();
     } catch (err) {
       console.error("handleAddPharmacy error:", err);
+      registerTechnicalError("CONNECT_PHARMACY", err);
       const code = (err as any)?.code ? ` (${String((err as any).code)})` : "";
       setAddPharmacyError(`Error connecting to pharmacy${code}.`);
     } finally {
@@ -500,6 +508,8 @@ export default function DriverDashboardPage() {
   }
 
   async function handleAcceptOrder(id: string) {
+    await ensureAnonymousAuth();
+
     const liveLocation = await getDriverCurrentLocation();
 
     await updateDoc(doc(db, "orders", id), {
@@ -577,6 +587,8 @@ export default function DriverDashboardPage() {
   }
 
   async function handleOnWayToPharmacy(id: string) {
+    await ensureAnonymousAuth();
+
     const liveLocation = await getDriverCurrentLocation();
 
     await updateDoc(doc(db, "orders", id), {
@@ -607,6 +619,8 @@ export default function DriverDashboardPage() {
   }
 
   async function handleArrivedAtCustomer(order: Order) {
+    await ensureAnonymousAuth();
+
     setSelectedOrder(order);
     setShowDeliveryModal(true);
     setDeliveryContextTimeISO(new Date().toISOString());
@@ -645,11 +659,14 @@ export default function DriverDashboardPage() {
       setTimeout(() => setDeliveryInfo(""), 6000);
     } catch (err) {
       console.warn("Failed to register arrival at customer:", err);
+      registerTechnicalError("ARRIVED_AT_CUSTOMER", err);
     }
   }
 
   async function handleCompleteDelivery() {
     if (!selectedOrder) return;
+
+    await ensureAnonymousAuth();
 
     const order = selectedOrder;
 
@@ -776,6 +793,8 @@ export default function DriverDashboardPage() {
       const [deliverySignatureRef] = await Promise.all([
         addDoc(collection(db, "deliverySignatures"), {
           ...baseDeliveryData,
+          signature,
+          driverSignature,
           deliveredAt: serverTimestamp(),
           legalPdfUrl: "",
         }),
@@ -934,9 +953,11 @@ export default function DriverDashboardPage() {
       })();
     } catch (err) {
       console.error("handleCompleteDelivery error:", err);
+      registerTechnicalError("CONFIRM_DELIVERY", err);
+      const code = (err as any)?.code ? ` (${String((err as any).code)})` : "";
       setShowDeliveryModal(true);
       setDeliveryInfo("");
-      setDeliveryError("Failed to confirm delivery. Please try again.");
+      setDeliveryError(`Failed to confirm delivery${code}. Please try again.`);
     } finally {
       setDeliveryLoading(false);
     }
@@ -978,6 +999,15 @@ export default function DriverDashboardPage() {
           <p className="text-yellow-300 text-sm text-center">
             {acceptInfo}
           </p>
+        )}
+
+        {lastTechnicalError && (
+          <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3">
+            <p className="text-[11px] font-semibold text-rose-300 uppercase tracking-wider">
+              Last technical error
+            </p>
+            <p className="text-xs text-rose-200/90 mt-1 break-all">{lastTechnicalError}</p>
+          </div>
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -1328,6 +1358,7 @@ export default function DriverDashboardPage() {
                     loadOrders();
                   } catch (err) {
                     console.error("Pickup failed:", err);
+                    registerTechnicalError("CONFIRM_PICKUP", err);
                     const code = (err as any)?.code ? ` (${String((err as any).code)})` : "";
                     alert(`Error confirming pickup${code}.`);
                   }
