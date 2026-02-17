@@ -36,6 +36,7 @@ import { generateSHA256Hash } from "@/lib/hashSignature";
 import { generateDeliveryPDF } from "@/lib/generateDeliveryPDF";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import NotificationBell from "@/components/NotificationBell";
 
 /* ---------- Types ---------- */
 type Pharmacy = {
@@ -973,10 +974,17 @@ export default function DriverDashboardPage() {
   return (
     <main className="min-h-screen bg-[#020617] text-white flex justify-center py-10 px-4">
       <div className="w-full max-w-5xl space-y-8">
-        <div className="text-center space-y-2">
+        <div className="flex items-center justify-center gap-4">
           <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-white to-emerald-200 bg-clip-text text-transparent">
             Driver Dashboard
           </h1>
+          {driverId && (
+            <NotificationBell 
+              userId={driverId} 
+              role="DRIVER" 
+            />
+          )}
+        </div>
           <p className="text-xs text-white/50 uppercase tracking-widest font-semibold">
             {driverName || "Driver"}
           </p>
