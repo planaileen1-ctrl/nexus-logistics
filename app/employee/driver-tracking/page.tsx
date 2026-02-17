@@ -31,6 +31,13 @@ type Driver = {
   lastUpdate?: number;
 };
 
+type DriverLocationPoint = {
+  lat: number;
+  lng: number;
+  capturedAtMs: number;
+  pharmacyId?: string;
+};
+
 const ACTIVE_DELIVERY_STATUSES = [
   "ASSIGNED",
   "IN_PROGRESS",
@@ -53,6 +60,8 @@ export default function DriverTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [relativeTimeNow, setRelativeTimeNow] = useState(Date.now());
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [selectedDriverPath, setSelectedDriverPath] = useState<Array<[number, number]>>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -218,6 +227,91 @@ export default function DriverTrackingPage() {
 
   const showLocationPermissionWarning = !loading && drivers.length > 0 && driversWithoutLocation.length > 0;
 
+  useEffect(() => {
+    if (drivers.length === 0) {
+      setSelectedDriverId(null);
+      return;
+    }
+
+    const selectedStillExists =
+      selectedDriverId && drivers.some((driver) => driver.id === selectedDriverId);
+
+    if (!selectedStillExists) {
+      const withLocation = drivers.find(
+        (driver) => driver.lat !== undefined && driver.lng !== undefined
+      );
+      setSelectedDriverId(withLocation?.id || drivers[0].id);
+    }
+  }, [drivers, selectedDriverId]);
+
+  useEffect(() => {
+    if (!selectedDriverId) {
+      setSelectedDriverPath([]);
+      return;
+    }
+
+    let unsubscribe: null | (() => void) = null;
+
+    (async () => {
+      await ensureAnonymousAuth();
+
+      const q = query(
+        collection(db, "driver_location_points"),
+        where("driverId", "==", selectedDriverId)
+      );
+
+      unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const points = snapshot.docs
+            .map((item) => item.data() as any)
+            .map((point) => {
+              const capturedAtMs =
+                typeof point.capturedAtMs === "number"
+                  ? point.capturedAtMs
+                  : typeof point.capturedAt?.toMillis === "function"
+                  ? point.capturedAt.toMillis()
+                  : 0;
+
+              return {
+                lat: point.lat,
+                lng: point.lng,
+                capturedAtMs,
+                pharmacyId: point.pharmacyId,
+              } as DriverLocationPoint;
+            })
+            .filter(
+              (point) =>
+                typeof point.lat === "number" &&
+                typeof point.lng === "number" &&
+                (!pharmacyId || !point.pharmacyId || point.pharmacyId === pharmacyId)
+            )
+            .sort((a, b) => a.capturedAtMs - b.capturedAtMs)
+            .slice(-120);
+
+          const path: Array<[number, number]> = [];
+
+          points.forEach((point) => {
+            const last = path[path.length - 1];
+            if (!last || last[0] !== point.lat || last[1] !== point.lng) {
+              path.push([point.lat, point.lng]);
+            }
+          });
+
+          setSelectedDriverPath(path);
+        },
+        (err) => {
+          console.error("driver path listener error:", err);
+          setSelectedDriverPath([]);
+        }
+      );
+    })();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [selectedDriverId, pharmacyId]);
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#020617] via-[#0a091e] to-[#020617] text-white p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -268,11 +362,21 @@ export default function DriverTrackingPage() {
               </div>
             </div>
           ) : drivers.length > 0 ? (
-            <MapComponent drivers={drivers} />
+            <MapComponent
+              drivers={drivers}
+              selectedDriverId={selectedDriverId}
+              selectedDriverPath={selectedDriverPath}
+            />
           ) : (
             <div className="h-96 flex items-center justify-center text-slate-400">
               <p>No active delivery drivers at this moment</p>
             </div>
+          )}
+
+          {selectedDriverId && selectedDriverPath.length > 1 && (
+            <p className="text-[11px] text-slate-400 mt-3">
+              Showing trajectory for selected driver • {selectedDriverPath.length} points
+            </p>
           )}
         </div>
 
@@ -287,33 +391,35 @@ export default function DriverTrackingPage() {
               No delivery drivers currently active
             </div>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {drivers.map((driver) => (
-                <div
+                <button
                   key={driver.id}
-                  className="bg-gradient-to-r from-slate-800/40 to-slate-900/40 border border-slate-700/50 rounded-lg p-4 flex items-center justify-between"
+                  type="button"
+                  onClick={() => setSelectedDriverId(driver.id)}
+                  className={`text-left bg-gradient-to-r from-slate-800/40 to-slate-900/40 border rounded-lg p-3 transition-colors ${
+                    selectedDriverId === driver.id
+                      ? "border-emerald-400/60 bg-emerald-500/10"
+                      : "border-slate-700/50 hover:border-slate-500/70"
+                  }`}
                 >
                   <div className="space-y-1">
-                    <p className="font-semibold text-white">{driver.name}</p>
-                    <p className="text-xs text-slate-400">ID: {driver.id}</p>
+                    <p className="font-semibold text-white text-sm truncate">{driver.name}</p>
+                    <p className="text-[11px] text-slate-400 truncate">ID: {driver.id}</p>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className={`flex items-center gap-2`}>
-                      <div className={`w-3 h-3 rounded-full ${getStatusColor(driver.status)}`} />
-                      <p className="text-sm text-slate-300">
-                        {statusLabel(driver.status)}
-                      </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(driver.status)}`} />
+                      <p className="text-xs text-slate-300">{statusLabel(driver.status)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-emerald-400 font-semibold">
-                        {getRelativeTime(driver.lastUpdate)}
-                      </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-[11px] text-emerald-400 font-semibold">{getRelativeTime(driver.lastUpdate)}</p>
+                      <p className="text-[11px] text-slate-500">
                         {driver.lastUpdate ? new Date(driver.lastUpdate).toLocaleTimeString("en-US") : "N/A"}
                       </p>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

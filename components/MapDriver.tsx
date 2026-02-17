@@ -21,14 +21,24 @@ type Driver = {
   status?: string;
 };
 
-const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
+const MapComponent = ({
+  drivers,
+  selectedDriverId,
+  selectedDriverPath,
+}: {
+  drivers: Driver[];
+  selectedDriverId?: string | null;
+  selectedDriverPath?: Array<[number, number]>;
+}) => {
   const ECUADOR_CENTER: [number, number] = [-1.8312, -78.1834];
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersLayerRef = useRef<any>(null);
+  const pathLayerRef = useRef<any>(null);
   const hasUserInteractedRef = useRef(false);
   const hasAutoCenteredRef = useRef(false);
+  const lastFocusedDriverIdRef = useRef<string | null>(null);
 
   function handleRecenterMap() {
     if (!mapRef.current || !window.L) return;
@@ -103,6 +113,7 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
           }).addTo(mapRef.current);
 
           markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
+          pathLayerRef.current = L.layerGroup().addTo(mapRef.current);
 
           mapRef.current.on("dragstart zoomstart", () => {
             hasUserInteractedRef.current = true;
@@ -117,17 +128,50 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
         };
 
         markersLayerRef.current?.clearLayers();
+        pathLayerRef.current?.clearLayers();
+
+        if (selectedDriverPath && selectedDriverPath.length > 1) {
+          L.polyline(selectedDriverPath, {
+            color: "#34d399",
+            weight: 4,
+            opacity: 0.85,
+          }).addTo(pathLayerRef.current);
+
+          const start = selectedDriverPath[0];
+          const end = selectedDriverPath[selectedDriverPath.length - 1];
+
+          L.circleMarker(start, {
+            radius: 5,
+            fillColor: "#22c55e",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+          })
+            .bindPopup("Trajectory start")
+            .addTo(pathLayerRef.current);
+
+          L.circleMarker(end, {
+            radius: 6,
+            fillColor: "#10b981",
+            color: "#ffffff",
+            weight: 2,
+            fillOpacity: 1,
+          })
+            .bindPopup("Current/last point")
+            .addTo(pathLayerRef.current);
+        }
 
         drivers.forEach((driver) => {
           if (driver.lat === undefined || driver.lng === undefined) return;
 
           const markerColor = colorMap[driver.status || ""] || "#666";
+          const isSelected = selectedDriverId === driver.id;
 
           L.circleMarker([driver.lat, driver.lng], {
-            radius: 8,
+            radius: isSelected ? 10 : 8,
             fillColor: markerColor,
-            color: "#fff",
-            weight: 2,
+            color: isSelected ? "#34d399" : "#fff",
+            weight: isSelected ? 3 : 2,
             opacity: 1,
             fillOpacity: 0.85,
           })
@@ -160,6 +204,24 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
           }
         }
 
+        if (
+          selectedDriverId &&
+          selectedDriverId !== lastFocusedDriverIdRef.current
+        ) {
+          const selectedDriver = drivers.find(
+            (d) => d.id === selectedDriverId && d.lat !== undefined && d.lng !== undefined
+          );
+
+          if (selectedDriver) {
+            const currentZoom = mapRef.current.getZoom?.() || 12;
+            mapRef.current.setView(
+              [selectedDriver.lat!, selectedDriver.lng!],
+              Math.max(currentZoom, 13)
+            );
+            lastFocusedDriverIdRef.current = selectedDriverId;
+          }
+        }
+
         setTimeout(() => {
           mapRef.current?.invalidateSize();
         }, 0);
@@ -171,7 +233,7 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
     return () => {
       cancelled = true;
     };
-  }, [drivers]);
+  }, [drivers, selectedDriverId, selectedDriverPath]);
 
   useEffect(() => {
     return () => {
@@ -180,8 +242,10 @@ const MapComponent = ({ drivers }: { drivers: Driver[] }) => {
         mapRef.current = null;
       }
       markersLayerRef.current = null;
+      pathLayerRef.current = null;
       hasUserInteractedRef.current = false;
       hasAutoCenteredRef.current = false;
+      lastFocusedDriverIdRef.current = null;
     };
   }, []);
 

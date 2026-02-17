@@ -140,6 +140,22 @@ service cloud.firestore {
       allow delete: if isSignedIn();
     }
 
+    match /driver_location_points/{pointId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && hasFields(["driverId", "driverName", "pharmacyId", "status", "lat", "lng", "capturedAtMs"])
+        && request.resource.data.driverId is string
+        && request.resource.data.driverName is string
+        && request.resource.data.pharmacyId is string
+        && request.resource.data.status is string
+        && request.resource.data.lat is number
+        && request.resource.data.lng is number
+        && request.resource.data.capturedAtMs is number;
+
+      allow update, delete: if false;
+    }
+
     /* ------------------------------
        Audit / legal artifacts
     ------------------------------ */

@@ -140,6 +140,41 @@ function formatDateTime(value: string | number | Date) {
   return new Date(value).toLocaleString("en-US", DATE_TIME_FORMAT);
 }
 
+async function recordDriverLocationPoint({
+  driverId,
+  driverName,
+  pharmacyId,
+  orderId,
+  status,
+  lat,
+  lng,
+}: {
+  driverId: string;
+  driverName: string;
+  pharmacyId: string;
+  orderId?: string;
+  status: string;
+  lat: number;
+  lng: number;
+}) {
+  try {
+    await addDoc(collection(db, "driver_location_points"), {
+      driverId,
+      driverName,
+      pharmacyId,
+      orderId: orderId || null,
+      status,
+      lat,
+      lng,
+      capturedAtMs: Date.now(),
+      capturedAt: serverTimestamp(),
+      source: "DRIVER_DASHBOARD",
+    });
+  } catch (err) {
+    console.warn("recordDriverLocationPoint error:", err);
+  }
+}
+
 /* ---------- Signature Canvas ---------- */
 function SignatureCanvas({
   label,
@@ -369,6 +404,35 @@ export default function DriverDashboardPage() {
     };
   }, [connectedPharmacies, driverId]);
 
+  useEffect(() => {
+    if (!driverId || !driverName || activeOrders.length === 0) return;
+
+    const intervalId = setInterval(async () => {
+      const location = await getDriverCurrentLocation({
+        timeoutMs: 2000,
+        maximumAge: 15000,
+      });
+
+      if (!location) return;
+
+      await Promise.all(
+        activeOrders.map(async (order) => {
+          await recordDriverLocationPoint({
+            driverId,
+            driverName,
+            pharmacyId: order.pharmacyId,
+            orderId: order.id,
+            status: String(order.status || "ACTIVE"),
+            lat: location.lat,
+            lng: location.lng,
+          });
+        })
+      );
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [activeOrders, driverId, driverName]);
+
   async function handleAddPharmacy() {
     await ensureAnonymousAuth();
 
@@ -459,6 +523,18 @@ export default function DriverDashboardPage() {
       activeOrders.find((o) => o.id === id);
 
     if (order) {
+      if (liveLocation && driverId && driverName) {
+        await recordDriverLocationPoint({
+          driverId,
+          driverName,
+          pharmacyId: order.pharmacyId,
+          orderId: order.id,
+          status: "ASSIGNED",
+          lat: liveLocation.lat,
+          lng: liveLocation.lng,
+        });
+      }
+
       if (order.returnReminderNote) {
         setAcceptInfo(order.returnReminderNote);
         setTimeout(() => setAcceptInfo(""), 7000);
@@ -513,6 +589,20 @@ export default function DriverDashboardPage() {
           }
         : {}),
     });
+
+    const order = activeOrders.find((o) => o.id === id);
+    if (liveLocation && order && driverId && driverName) {
+      await recordDriverLocationPoint({
+        driverId,
+        driverName,
+        pharmacyId: order.pharmacyId,
+        orderId: order.id,
+        status: "ON_WAY_TO_PHARMACY",
+        lat: liveLocation.lat,
+        lng: liveLocation.lng,
+      });
+    }
+
     loadOrders();
   }
 
@@ -536,6 +626,18 @@ export default function DriverDashboardPage() {
             }
           : {}),
       });
+
+      if (liveLocation && driverId && driverName) {
+        await recordDriverLocationPoint({
+          driverId,
+          driverName,
+          pharmacyId: order.pharmacyId,
+          orderId: order.id,
+          status: "ON_WAY_TO_CUSTOMER",
+          lat: liveLocation.lat,
+          lng: liveLocation.lng,
+        });
+      }
 
       setDeliveryInfo(
         `Arrival registered: ${formatDateTime(arrivedAtISO)}`
@@ -621,6 +723,18 @@ export default function DriverDashboardPage() {
         ]);
 
       const [location, ip] = await Promise.all([locationPromise, ipPromise]);
+
+      if (location && driverId && driverName) {
+        await recordDriverLocationPoint({
+          driverId,
+          driverName,
+          pharmacyId: order.pharmacyId,
+          orderId: order.id,
+          status: "DELIVERED",
+          lat: location.lat,
+          lng: location.lng,
+        });
+      }
 
       const allReturned =
         previousPumpsStatusList.length > 0 &&
@@ -1194,6 +1308,18 @@ export default function DriverDashboardPage() {
                           : {}),
                       }
                     );
+
+                    if (liveLocation && driverId && driverName) {
+                      await recordDriverLocationPoint({
+                        driverId,
+                        driverName,
+                        pharmacyId: selectedOrder.pharmacyId,
+                        orderId: selectedOrder.id,
+                        status: "ON_WAY_TO_CUSTOMER",
+                        lat: liveLocation.lat,
+                        lng: liveLocation.lng,
+                      });
+                    }
 
                     loadOrders();
                   } catch (err) {
