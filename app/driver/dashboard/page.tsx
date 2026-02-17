@@ -299,6 +299,8 @@ export default function DriverDashboardPage() {
   }, [showDeliveryModal, selectedOrder]);
 
   async function loadConnectedPharmacies() {
+    await ensureAnonymousAuth();
+
     const snap = await getDocs(
       collection(db, "drivers", driverId!, "pharmacies")
     );
@@ -368,6 +370,8 @@ export default function DriverDashboardPage() {
   }, [connectedPharmacies, driverId]);
 
   async function handleAddPharmacy() {
+    await ensureAnonymousAuth();
+
     setAddPharmacyError("");
     setAddPharmacyInfo("");
     if (!driverId) {
