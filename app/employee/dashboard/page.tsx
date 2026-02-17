@@ -42,6 +42,7 @@ export default function EmployeeDashboardPage() {
   const [pumpOutOver20Count, setPumpOutOver20Count] = useState(0);
   const [pumpOutOver30Count, setPumpOutOver30Count] = useState(0);
   const [pumpReturnsPendingCount, setPumpReturnsPendingCount] = useState(0);
+  const [maintenancePendingCount, setMaintenancePendingCount] = useState(0);
 
   useEffect(() => {
     const name = localStorage.getItem("EMPLOYEE_NAME") || "Unknown Employee";
@@ -71,6 +72,7 @@ export default function EmployeeDashboardPage() {
           setPumpOutOver20Count(0);
           setPumpOutOver30Count(0);
           setPumpReturnsPendingCount(0);
+          setMaintenancePendingCount(0);
           return;
         }
 
@@ -191,12 +193,26 @@ export default function EmployeeDashboardPage() {
         }, 0);
 
         setPumpReturnsPendingCount(pendingReturnsCount);
+
+        const pumpsSnap = await getDocs(
+          query(collection(db, "pumps"), where("pharmacyId", "==", pharmacyId))
+        );
+
+        const maintenanceCount = pumpsSnap.docs.reduce((count, d) => {
+          const pump = d.data() as any;
+          const isActive = pump.active !== false;
+          const needsMaintenance = pump.maintenanceDue === true;
+          return isActive && needsMaintenance ? count + 1 : count;
+        }, 0);
+
+        setMaintenancePendingCount(maintenanceCount);
       } catch (err) {
         console.error("Failed to load pump out count:", err);
         setPumpOutCount(0);
         setPumpOutOver20Count(0);
         setPumpOutOver30Count(0);
         setPumpReturnsPendingCount(0);
+        setMaintenancePendingCount(0);
       }
     })();
   }, []);
@@ -310,6 +326,8 @@ export default function EmployeeDashboardPage() {
       cardClass:
         "from-lime-500/15 to-lime-600/5 border-lime-500/30 hover:border-lime-400/70 hover:shadow-lime-500/20",
       textClass: "text-lime-400",
+      badge: maintenancePendingCount,
+      heartbeat: maintenancePendingCount > 0,
     },
     {
       id: "activity",
