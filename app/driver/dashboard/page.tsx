@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Truck, RotateCcw, Link2, FileText, PackageOpen, AlertTriangle } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
+import { requestNotificationPermission, saveNotificationToken } from "@/lib/pushNotifications";
 import {
   collection,
   getDocs,
@@ -31,7 +32,6 @@ import {
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
 import { sendAppEmail } from "@/lib/emailClient";
-import { sendPushNotification } from "@/lib/pushNotifications";
 import DeliverySignature from "@/components/DeliverySignature";
 import { uploadSignatureToStorage } from "@/lib/uploadSignature";
 import { generateSHA256Hash } from "@/lib/hashSignature";
@@ -300,6 +300,17 @@ export default function DriverDashboardPage() {
   const [previousPumpsStatus, setPreviousPumpsStatus] = useState<
     Record<string, { returned: boolean; reason: string }>
   >({});
+
+  const [notifPermission, setNotifPermission] = useState<string>(
+    typeof Notification !== "undefined" ? Notification.permission : "default"
+  );
+  const [notifToken, setNotifToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
@@ -948,10 +959,35 @@ export default function DriverDashboardPage() {
           </p>
         </div>
 
-        <div className="relative">
+        <div className="flex justify-end mt-2">
           {driverId && (
-            <div className="absolute right-6 -top-2">
+            <div className="flex items-center gap-3">
               <NotificationBell userId={driverId} role="DRIVER" />
+              <div className="text-right text-xs text-white/60">
+                <div>Notifications: <span className="font-semibold text-white/80">{notifPermission}</span></div>
+                {notifToken ? (
+                  <div className="break-all text-[10px] mt-1">Token: {notifToken}</div>
+                ) : (
+                  <div className="mt-1">Token: —</div>
+                )}
+                <div className="mt-1">
+                  <button
+                    onClick={async () => {
+                      const token = await requestNotificationPermission();
+                      if (token) {
+                        setNotifToken(token);
+                        setNotifPermission("granted");
+                        await saveNotificationToken(token, driverId, "DRIVER");
+                      } else {
+                        if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
+                      }
+                    }}
+                    className="text-xs underline"
+                  >
+                    Request permission / Refresh token
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
