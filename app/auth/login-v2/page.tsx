@@ -35,7 +35,7 @@ export default function LoginV2Page() {
         <div className="flex justify-start mb-3">
           <button
             onClick={() => router.push('/auth/login')}
-            className="text-xs text-indigo-300 hover:text-indigo-200 px-3 py-1 rounded bg-white/5 border border-white/8"
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors"
           >
             ← Go to current login
           </button>

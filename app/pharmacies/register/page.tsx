@@ -187,7 +187,7 @@ export default function RegisterPharmacyPage() {
         <div className="flex justify-start">
           <button
             onClick={() => router.back()}
-            className="text-xs text-white/70 hover:text-white px-3 py-1 rounded bg-white/5 border border-white/10"
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors"
           >
             ← BACK
           </button>

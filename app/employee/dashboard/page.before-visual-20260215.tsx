@@ -221,7 +221,7 @@ export default function EmployeeDashboardPage() {
         <div className="mt-4">
           <button
             onClick={() => router.back()}
-            className="text-sm text-slate-400 hover:text-slate-200 font-semibold uppercase tracking-wide px-3 py-1 rounded bg-white/5 border border-white/8"
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors"
           >
             ← Back
           </button>

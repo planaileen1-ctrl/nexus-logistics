@@ -73,7 +73,7 @@ export default function AdminLoginPage() {
         <div className="w-full max-w-xs flex justify-start">
           <button
             onClick={() => window.history.back()}
-            className="text-xs uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors duration-300 font-semibold mt-2"
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-md bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors"
           >
             ← BACK
           </button>
