@@ -1285,11 +1285,15 @@ export default function DriverDashboardPage() {
                   setDriverPickupSignature("");
 
                   try {
+                    await ensureAnonymousAuth();
                     const liveLocation = await getDriverCurrentLocation();
 
                     await addDoc(collection(db, "pickupSignatures"), {
                       orderId: selectedOrder.id,
                       pharmacyId: selectedOrder.pharmacyId,
+                      signature: employeeSignature,
+                      employeeName: selectedOrder.pharmacyName || "PHARMACY_STAFF",
+                      driverName: driverName || "UNKNOWN",
                       employeeSignature,
                       driverSignature: driverPickupSignature,
                       createdAt: serverTimestamp(),
@@ -1324,7 +1328,8 @@ export default function DriverDashboardPage() {
                     loadOrders();
                   } catch (err) {
                     console.error("Pickup failed:", err);
-                    alert("Error confirming pickup.");
+                    const code = (err as any)?.code ? ` (${String((err as any).code)})` : "";
+                    alert(`Error confirming pickup${code}.`);
                   }
                 }}
                 className="w-full bg-green-600 py-2 rounded disabled:opacity-50"
