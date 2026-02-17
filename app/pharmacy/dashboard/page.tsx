@@ -201,6 +201,27 @@ export default function PharmacyDashboardPage() {
 
         setPumpReturnsPendingCount(pendingReturnsCount);
 
+        const pendingReturnPumpNumbers = new Set<string>();
+        orders.forEach((order: any) => {
+          const returnedByCustomer = (order.previousPumpsStatus || [])
+            .filter((entry: any) => entry?.returned === true)
+            .map((entry: any) => String(entry?.pumpNumber || "").trim())
+            .filter(Boolean);
+
+          const returnedToPharmacySet = new Set(
+            (order.previousPumpsReturnToPharmacy || [])
+              .filter((entry: any) => entry?.returnedToPharmacy === true)
+              .map((entry: any) => String(entry?.pumpNumber || "").trim())
+              .filter(Boolean)
+          );
+
+          returnedByCustomer.forEach((pumpNumber: string) => {
+            if (!returnedToPharmacySet.has(pumpNumber)) {
+              pendingReturnPumpNumbers.add(pumpNumber);
+            }
+          });
+        });
+
         const pumpsSnap = await getDocs(
           query(collection(db, "pumps"), where("pharmacyId", "==", pharmacyId))
         );
@@ -209,7 +230,11 @@ export default function PharmacyDashboardPage() {
           const pump = d.data() as any;
           const isActive = pump.active !== false;
           const needsMaintenance = pump.maintenanceDue === true;
-          return isActive && needsMaintenance ? count + 1 : count;
+          const pumpNumber = String(pump.pumpNumber || "").trim();
+          const isPendingReturnTransit = pumpNumber
+            ? pendingReturnPumpNumbers.has(pumpNumber)
+            : false;
+          return isActive && needsMaintenance && !isPendingReturnTransit ? count + 1 : count;
         }, 0);
 
         setMaintenancePendingCount(maintenanceCount);

@@ -47,13 +47,16 @@ export default function PumpMaintenancePage() {
       ? localStorage.getItem("EMPLOYEE_ROLE") === "PHARMACY_ADMIN"
       : false;
 
+  const [allPumps, setAllPumps] = useState<Pump[]>([]);
   const [pumps, setPumps] = useState<Pump[]>([]);
+  const [pendingReturnPumpNumbers, setPendingReturnPumpNumbers] = useState<Set<string>>(new Set());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [info, setInfo] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     let unsubscribe: null | (() => void) = null;
+    let ordersUnsubscribe: null | (() => void) = null;
 
     (async () => {
       await ensureAnonymousAuth();
@@ -65,18 +68,62 @@ export default function PumpMaintenancePage() {
       );
 
       unsubscribe = onSnapshot(q, (snap) => {
-        const list = snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as any) }))
-          .filter((p) => p.maintenanceDue === true);
+        const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        setAllPumps(list);
+      });
 
-        setPumps(list);
+      const ordersQ = query(
+        collection(db, "orders"),
+        where("pharmacyId", "==", pharmacyId)
+      );
+
+      ordersUnsubscribe = onSnapshot(ordersQ, (snap) => {
+        const pending = new Set<string>();
+
+        snap.docs.forEach((d) => {
+          const order = d.data() as any;
+
+          const returnedByCustomer = (order.previousPumpsStatus || [])
+            .filter((entry: any) => entry?.returned === true)
+            .map((entry: any) => String(entry?.pumpNumber || "").trim())
+            .filter(Boolean);
+
+          if (returnedByCustomer.length === 0) return;
+
+          const returnedToPharmacy = new Set(
+            (order.previousPumpsReturnToPharmacy || [])
+              .filter((entry: any) => entry?.returnedToPharmacy === true)
+              .map((entry: any) => String(entry?.pumpNumber || "").trim())
+              .filter(Boolean)
+          );
+
+          returnedByCustomer.forEach((pumpNumber: string) => {
+            if (!returnedToPharmacy.has(pumpNumber)) {
+              pending.add(pumpNumber);
+            }
+          });
+        });
+
+        setPendingReturnPumpNumbers(pending);
       });
     })();
 
     return () => {
       if (unsubscribe) unsubscribe();
+      if (ordersUnsubscribe) ordersUnsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const filtered = allPumps.filter((p: any) => {
+      if (p.maintenanceDue !== true) return false;
+      const pumpNumber = String(p.pumpNumber || "").trim();
+      if (!pumpNumber) return true;
+      return !pendingReturnPumpNumbers.has(pumpNumber);
+    });
+
+    setPumps(filtered);
+  }, [allPumps, pendingReturnPumpNumbers]);
 
   async function handleSave(pumpId: string) {
     setError("");
