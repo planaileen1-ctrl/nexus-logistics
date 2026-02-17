@@ -37,6 +37,35 @@ export default function LoginPage() {
 
   const requiredDigits = pendingPharmacy ? 6 : 4;
 
+  function toMillis(ts: any): number {
+    if (!ts) return 0;
+    if (typeof ts?.toMillis === "function") return ts.toMillis();
+    if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+    if (typeof ts === "string") return new Date(ts).getTime();
+    return 0;
+  }
+
+  function resolveDriverDocForPin(docs: any[], pinValue: string) {
+    if (!docs || docs.length === 0) return null;
+    if (docs.length === 1) return docs[0];
+
+    const cacheKey = `DRIVER_LAST_ID_FOR_PIN_${pinValue}`;
+    const cachedId = typeof window !== "undefined" ? localStorage.getItem(cacheKey) : null;
+
+    if (cachedId) {
+      const matched = docs.find((d) => d.id === cachedId);
+      if (matched) return matched;
+    }
+
+    const sorted = [...docs].sort((a, b) => {
+      const aMs = toMillis(a.data()?.createdAt);
+      const bMs = toMillis(b.data()?.createdAt);
+      return bMs - aMs;
+    });
+
+    return sorted[0];
+  }
+
   useEffect(() => {
     void ensureAnonymousAuth();
   }, []);
@@ -195,11 +224,12 @@ export default function LoginPage() {
 
       // 4️⃣ DRIVER
       if (!driverSnap.empty) {
-        const driverDoc = driverSnap.docs[0];
+        const driverDoc = resolveDriverDocForPin(driverSnap.docs, activePin) || driverSnap.docs[0];
         const driver = driverDoc.data();
 
         localStorage.setItem("DRIVER_ID", driverDoc.id);
         localStorage.setItem("DRIVER_NAME", driver.fullName);
+        localStorage.setItem(`DRIVER_LAST_ID_FOR_PIN_${activePin}`, driverDoc.id);
 
         router.replace("/driver/dashboard");
         return;

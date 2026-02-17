@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, serverTimestamp, where } from "firebase/firestore";
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import SignaturePad from "@/components/SignaturePad";
 import { sendAppEmail } from "@/lib/emailClient";
@@ -73,6 +73,24 @@ export default function RegisterDriverPage() {
     ensureAnonymousAuth();
   }, []);
 
+  async function generateUniqueLoginPin(maxAttempts = 40): Promise<string> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const candidate = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const [pharmacySnap, employeeSnap, driverSnap] = await Promise.all([
+        getDocs(query(collection(db, "pharmacies"), where("pin", "==", candidate))),
+        getDocs(query(collection(db, "employees"), where("pin", "==", candidate))),
+        getDocs(query(collection(db, "drivers"), where("pin", "==", candidate))),
+      ]);
+
+      if (pharmacySnap.empty && employeeSnap.empty && driverSnap.empty) {
+        return candidate;
+      }
+    }
+
+    throw new Error("Unable to generate a unique login PIN");
+  }
+
   async function handleRegister() {
     setError(null);
     setLoading(true);
@@ -80,7 +98,7 @@ export default function RegisterDriverPage() {
     try {
       await ensureAnonymousAuth();
 
-      const pin = Math.floor(1000 + Math.random() * 9000).toString();
+      const pin = await generateUniqueLoginPin();
 
       const ref = await addDoc(collection(db, "drivers"), {
         fullName: fullName.toUpperCase(),
