@@ -966,7 +966,7 @@ export default function DriverDashboardPage() {
               <div className="text-right text-xs text-white/60">
                 <div>Notifications: <span className="font-semibold text-white/80">{notifPermission}</span></div>
                 {notifToken ? (
-                  <div className="break-all text-[10px] mt-1">Token: {notifToken}</div>
+                  <div className="mt-1 text-[11px]">Token: saved •••{notifToken.slice(-6)}</div>
                 ) : (
                   <div className="mt-1">Token: —</div>
                 )}
