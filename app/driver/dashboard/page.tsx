@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Truck, RotateCcw, Link2, FileText, PackageOpen, AlertTriangle } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 import {
   collection,
   getDocs,
@@ -30,6 +31,7 @@ import {
 import { db, ensureAnonymousAuth } from "@/lib/firebase";
 import { logPumpMovement } from "@/lib/pumpLogger";
 import { sendAppEmail } from "@/lib/emailClient";
+import { sendPushNotification } from "@/lib/pushNotifications";
 import DeliverySignature from "@/components/DeliverySignature";
 import { uploadSignatureToStorage } from "@/lib/uploadSignature";
 import { generateSHA256Hash } from "@/lib/hashSignature";
@@ -946,6 +948,14 @@ export default function DriverDashboardPage() {
           </p>
         </div>
 
+        <div className="relative">
+          {driverId && (
+            <div className="absolute right-6 -top-2">
+              <NotificationBell userId={driverId} role="DRIVER" />
+            </div>
+          )}
+        </div>
+
         {deliveryInfo && (
           <p className="text-green-400 text-sm text-center">
             {deliveryInfo}
@@ -982,6 +992,44 @@ export default function DriverDashboardPage() {
               DASHBOARD
             </span>
           </button>
+          
+          {/* Test push button for debugging */}
+          <div className="col-span-2 md:col-span-1 flex items-center">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!driverId) {
+                  setAcceptInfo("Driver ID missing for push test.");
+                  return;
+                }
+
+                setAcceptInfo("Sending test notification...");
+
+                try {
+                  const res = await fetch('/api/notifications/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: driverId, title: 'Test Notification', body: 'This is a test push.' }),
+                  });
+
+                  const json = await res.json();
+                  if (res.ok) {
+                    setAcceptInfo('Test notification sent.');
+                  } else {
+                    setAcceptInfo(`Push send failed: ${json?.error || res.statusText}`);
+                  }
+                } catch (err) {
+                  console.error('Test push error:', err);
+                  setAcceptInfo('Failed to send test notification.');
+                }
+
+                setTimeout(() => setAcceptInfo(''), 5000);
+              }}
+              className="py-2 rounded-lg text-xs font-semibold border bg-black/30 border-white/10 hover:border-white/30"
+            >
+              Send test push
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setDashboardSection("active")}
