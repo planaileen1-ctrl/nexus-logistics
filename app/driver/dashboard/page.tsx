@@ -963,36 +963,6 @@ export default function DriverDashboardPage() {
           {driverId && (
             <div className="flex items-center gap-3">
               <NotificationBell userId={driverId} role="DRIVER" />
-              <div className="text-right text-xs text-white/60">
-                <div className="inline-flex items-center gap-3">
-                  <div>
-                    Notifications: <span className="font-semibold text-white/80">{notifPermission}</span>
-                  </div>
-                  {notifToken && notifPermission === "granted" && (
-                    <div className="text-[11px] text-white/60">Saved •••{notifToken.slice(-6)}</div>
-                  )}
-                </div>
-
-                {(notifPermission !== "granted" || !notifToken) && (
-                  <div className="mt-2">
-                    <button
-                      onClick={async () => {
-                        const token = await requestNotificationPermission();
-                        if (token) {
-                          setNotifToken(token);
-                          setNotifPermission("granted");
-                          await saveNotificationToken(token, driverId, "DRIVER");
-                        } else {
-                          if (typeof Notification !== "undefined") setNotifPermission(Notification.permission);
-                        }
-                      }}
-                      className="text-xs px-2 py-1 bg-white/5 rounded hover:bg-white/8"
-                    >
-                      Request permission / Refresh token
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           )}
         </div>
@@ -1034,43 +1004,7 @@ export default function DriverDashboardPage() {
             </span>
           </button>
           
-          {/* Test push button for debugging */}
-          <div className="col-span-2 md:col-span-1 flex items-center">
-            <button
-              type="button"
-              onClick={async () => {
-                if (!driverId) {
-                  setAcceptInfo("Driver ID missing for push test.");
-                  return;
-                }
-
-                setAcceptInfo("Sending test notification...");
-
-                try {
-                  const res = await fetch('/api/notifications/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: driverId, title: 'Test Notification', body: 'This is a test push.' }),
-                  });
-
-                  const json = await res.json();
-                  if (res.ok) {
-                    setAcceptInfo('Test notification sent.');
-                  } else {
-                    setAcceptInfo(`Push send failed: ${json?.error || res.statusText}`);
-                  }
-                } catch (err) {
-                  console.error('Test push error:', err);
-                  setAcceptInfo('Failed to send test notification.');
-                }
-
-                setTimeout(() => setAcceptInfo(''), 5000);
-              }}
-              className="py-2 rounded-lg text-xs font-semibold border bg-black/30 border-white/10 hover:border-white/30"
-            >
-              Send test push
-            </button>
-          </div>
+          {/* Test push removed per request */}
           <button
             type="button"
             onClick={() => setDashboardSection("active")}
