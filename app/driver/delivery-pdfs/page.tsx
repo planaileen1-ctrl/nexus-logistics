@@ -146,7 +146,7 @@ export default function DriverDeliveryPdfsPage() {
 
         <div className="bg-black/40 border border-cyan-500/30 rounded-xl p-6">
           {deliveryBackups.length === 0 && (
-            <p className="text-xs text-white/60">No delivery PDFs available yet.</p>
+            <p className="text-xs text-white/60">No delivery PDFs available yet</p>
           )}
           {deliveryBackups.length > 0 && (
             <ul className="space-y-3">
