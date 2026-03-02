@@ -62,6 +62,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /eKits/{kitId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && hasFields(["pharmacyId", "kitCode"])
+        && request.resource.data.pharmacyId is string
+        && request.resource.data.kitCode is string;
+
+      allow update: if isSignedIn()
+        && unchangedKeys([
+          "pharmacyId",
+          "createdAt",
+          "createdById",
+          "createdBy"
+        ]);
+
+      allow delete: if false;
+    }
+
     match /customers/{customerId} {
       allow read: if isSignedIn();
 

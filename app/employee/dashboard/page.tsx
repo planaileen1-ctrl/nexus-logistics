@@ -316,6 +316,17 @@ export default function EmployeeDashboardPage() {
       highlight: true,
     },
     {
+      id: "e-kit",
+      title: "E-KIT",
+      desc: "Urgent supply boxes for priority requests",
+      emoji: "🆘",
+      link: "Open E-KIT",
+      onClick: () => router.push("/employee/e-kit"),
+      cardClass:
+        "from-violet-500/15 to-violet-600/5 border-violet-500/30 hover:border-violet-400/70 hover:shadow-violet-500/20",
+      textClass: "text-violet-400",
+    },
+    {
       id: "pump-out",
       title: "Pump Out (Clients)",
       desc: "Pumps pending for collection from clients",

@@ -38,13 +38,6 @@ type Pump = {
   maintenanceDue?: boolean;
 };
 
-type EKit = {
-  id: string;
-  kitCode: string;
-  status?: string | null;
-  active?: boolean;
-};
-
 type Customer = {
   id: string;
   name: string;
@@ -67,8 +60,6 @@ type ActivityOrder = {
   returnReminderNote?: string;
   pumpIds?: string[];
   pumpNumbers?: string[];
-  eKitIds?: string[];
-  eKitCodes?: string[];
   driverName?: string;
   createdByEmployeeName?: string;
   createdAt?: any;
@@ -121,13 +112,10 @@ export default function EmployeeOrdersPage() {
 
   /* ---------- State ---------- */
   const [pumps, setPumps] = useState<Pump[]>([]);
-  const [eKits, setEKits] = useState<EKit[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [pumpIds, setPumpIds] = useState<string[]>([]);
   const [pumpNumbers, setPumpNumbers] = useState<string[]>([]);
-  const [eKitIds, setEKitIds] = useState<string[]>([]);
-  const [eKitCodes, setEKitCodes] = useState<string[]>([]);
   const [pumpSearch, setPumpSearch] = useState("");
 
   const [customerId, setCustomerId] = useState("");
@@ -182,7 +170,6 @@ export default function EmployeeOrdersPage() {
       }
 
       await loadPumps();
-      await loadEKits();
       await loadCustomers();
     })();
   }, []);
@@ -258,31 +245,6 @@ export default function EmployeeOrdersPage() {
       .filter((p) => (!p.status || p.status === "AVAILABLE") && !p.maintenanceDue);
 
     setPumps(list);
-  }
-
-  async function loadEKits() {
-    if (!pharmacyId) return;
-
-    const q = query(
-      collection(db, "eKits"),
-      where("pharmacyId", "==", pharmacyId)
-    );
-
-    const snap = await getDocs(q);
-
-    const list = snap.docs
-      .map((d) => {
-        const data = d.data() as any;
-        return {
-          id: d.id,
-          kitCode: String(data.kitCode || "").trim(),
-          status: data.status ?? null,
-          active: data.active !== false,
-        } as EKit;
-      })
-      .filter((k) => k.active !== false && (!k.status || k.status === "AVAILABLE"));
-
-    setEKits(list);
   }
 
   async function loadCustomers() {
@@ -590,7 +552,6 @@ export default function EmployeeOrdersPage() {
 
     try {
       const pumpIdsToRelease = Array.isArray(order.pumpIds) ? order.pumpIds : [];
-      const eKitIdsToRelease = Array.isArray(order.eKitIds) ? order.eKitIds : [];
 
       for (const pumpId of pumpIdsToRelease) {
         try {
@@ -608,16 +569,6 @@ export default function EmployeeOrdersPage() {
           }
         } catch (pumpErr) {
           console.warn("Failed to release pump on order delete:", pumpId, pumpErr);
-        }
-      }
-
-      for (const eKitId of eKitIdsToRelease) {
-        try {
-          await updateDoc(doc(db, "eKits", eKitId), {
-            status: "AVAILABLE",
-          });
-        } catch (eKitErr) {
-          console.warn("Failed to release E-KIT on order delete:", eKitId, eKitErr);
         }
       }
 
@@ -640,8 +591,8 @@ export default function EmployeeOrdersPage() {
   async function handleCreateOrder() {
     setError("");
 
-    if ((pumpIds.length === 0 && eKitIds.length === 0) || !customerId) {
-      setError("At least one pump or E-KIT and a customer are required");
+    if (pumpIds.length === 0 || !customerId) {
+      setError("At least one pump and a customer are required");
       return;
     }
 
@@ -656,7 +607,14 @@ export default function EmployeeOrdersPage() {
        * - Any order NOT DELIVERED
        * - Regardless of customer, employee, or driver
        */
-      const hasActiveConflict = (docs: any[]) => docs.find((d) => {
+      const q = query(
+        collection(db, "orders"),
+        where("pumpNumbers", "array-contains-any", pumpNumbers)
+      );
+
+      const snap = await getDocs(q);
+
+      const conflict = snap.docs.find((d) => {
         const data = d.data() as any;
         const rawStatus = String(data.status || "").trim().toUpperCase();
         const effectiveStatus =
@@ -667,53 +625,20 @@ export default function EmployeeOrdersPage() {
         return effectiveStatus !== "DELIVERED";
       });
 
-      if (pumpNumbers.length > 0) {
-        const pumpConflictQuery = query(
-          collection(db, "orders"),
-          where("pumpNumbers", "array-contains-any", pumpNumbers)
+      if (conflict) {
+        setError(
+          "One or more selected pumps are already assigned to an active order."
         );
-
-        const pumpConflictSnap = await getDocs(pumpConflictQuery);
-        const conflict = hasActiveConflict(pumpConflictSnap.docs);
-
-        if (conflict) {
-          setError(
-            "One or more selected pumps are already assigned to an active order."
-          );
-          await loadPumps();
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (eKitCodes.length > 0) {
-        const eKitConflictQuery = query(
-          collection(db, "orders"),
-          where("eKitCodes", "array-contains-any", eKitCodes)
-        );
-
-        const eKitConflictSnap = await getDocs(eKitConflictQuery);
-        const conflict = hasActiveConflict(eKitConflictSnap.docs);
-
-        if (conflict) {
-          setError(
-            "One or more selected E-KITs are already assigned to an active order."
-          );
-          await loadEKits();
-          setLoading(false);
-          return;
-        }
+        await loadPumps();
+        setLoading(false);
+        return;
       }
 
       const selectedPumpDocs = await Promise.all(
         pumpIds.map((pumpId) => getDoc(doc(db, "pumps", pumpId)))
       );
-      const selectedEKitDocs = await Promise.all(
-        eKitIds.map((eKitId) => getDoc(doc(db, "eKits", eKitId)))
-      );
 
       const unavailablePumpNumbers: string[] = [];
-      const unavailableEKitCodes: string[] = [];
 
       selectedPumpDocs.forEach((pumpDoc, index) => {
         const pumpData = (pumpDoc.data() || {}) as any;
@@ -723,16 +648,6 @@ export default function EmployeeOrdersPage() {
 
         if (!pumpDoc.exists() || !active || maintenanceDue || status !== "AVAILABLE") {
           unavailablePumpNumbers.push(pumpNumbers[index]);
-        }
-      });
-
-      selectedEKitDocs.forEach((eKitDoc, index) => {
-        const eKitData = (eKitDoc.data() || {}) as any;
-        const status = String(eKitData.status || "AVAILABLE").trim().toUpperCase();
-        const active = eKitData.active !== false;
-
-        if (!eKitDoc.exists() || !active || status !== "AVAILABLE") {
-          unavailableEKitCodes.push(eKitCodes[index]);
         }
       });
 
@@ -751,28 +666,13 @@ export default function EmployeeOrdersPage() {
         return;
       }
 
-      if (unavailableEKitCodes.length > 0) {
-        setError(
-          `These E-KITs are no longer available: ${unavailableEKitCodes.join(", ")}. Refreshing list...`
-        );
-        await loadEKits();
-        setEKitIds((prev) =>
-          prev.filter((_, idx) => !unavailableEKitCodes.includes(eKitCodes[idx]))
-        );
-        setEKitCodes((prev) =>
-          prev.filter((code) => !unavailableEKitCodes.includes(code))
-        );
-        setLoading(false);
-        return;
-      }
+      const customer = customers.find((c) => c.id === customerId);
 
       const orderPayload = {
         pharmacyId,
         pharmacyName,
         pumpIds,
         pumpNumbers,
-        eKitIds,
-        eKitCodes,
         customerId,
         customerName: customers.find((c) => c.id === customerId)?.name,
         customerCity: customers.find((c) => c.id === customerId)?.city,
@@ -795,7 +695,6 @@ export default function EmployeeOrdersPage() {
 
       // ✅ ACTUALIZAR ESTADO DE CADA PUMP (no bloquear si falta permiso)
       const pumpUpdateFailures: string[] = [];
-      const eKitUpdateFailures: string[] = [];
 
       for (let i = 0; i < pumpIds.length; i++) {
         try {
@@ -819,38 +718,15 @@ export default function EmployeeOrdersPage() {
         }
       }
 
-      for (let i = 0; i < eKitIds.length; i++) {
-        try {
-          await updateDoc(doc(db, "eKits", eKitIds[i]), {
-            status: "ASSIGNED",
-          });
-        } catch (err) {
-          console.warn("E-KIT update failed:", eKitIds[i], err);
-          eKitUpdateFailures.push(eKitCodes[i]);
-        }
-      }
-
       setPumpIds([]);
       setPumpNumbers([]);
-      setEKitIds([]);
-      setEKitCodes([]);
       setPumpSearch("");
       setCustomerId("");
       await loadPumps();
-      await loadEKits();
 
-      if (pumpUpdateFailures.length > 0 || eKitUpdateFailures.length > 0) {
-        const pumpsText =
-          pumpUpdateFailures.length > 0
-            ? ` Pumps: ${pumpUpdateFailures.join(", ")}.`
-            : "";
-        const kitsText =
-          eKitUpdateFailures.length > 0
-            ? ` E-KITs: ${eKitUpdateFailures.join(", ")}.`
-            : "";
-
+      if (pumpUpdateFailures.length > 0) {
         setInfo(
-          `Order created, but some item updates failed due to permissions.${pumpsText}${kitsText}`
+          `Order created, but some pump updates failed due to permissions. Pumps: ${pumpUpdateFailures.join(", ")}.`
         );
       } else {
         setInfo("Order created and set to PENDING — drivers will receive it.");
@@ -872,12 +748,6 @@ export default function EmployeeOrdersPage() {
     (p) =>
       p.pumpNumber.toLowerCase().includes(normalizePumpScannerInput(pumpSearch).toLowerCase()) &&
       !pumpIds.includes(p.id)
-  );
-
-  const filteredEKits = eKits.filter(
-    (k) =>
-      k.kitCode.toLowerCase().includes(normalizePumpScannerInput(pumpSearch).toLowerCase()) &&
-      !eKitIds.includes(k.id)
   );
 
   function focusPumpSearchInput() {
@@ -902,40 +772,15 @@ export default function EmployeeOrdersPage() {
           !pumpIds.includes(p.id)
       );
 
-    if (candidate) {
-      setPumpIds((prev) => [...prev, candidate.id]);
-      setPumpNumbers((prev) => [...prev, candidate.pumpNumber]);
-      setPumpSearch("");
-      setError("");
-      setInfo(`Added Pump #${candidate.pumpNumber}`);
-      setTimeout(() => setInfo(""), 2500);
-      focusPumpSearchInput();
+    if (!candidate) {
+      setError(`Pump not found: ${normalized}`);
       return;
     }
 
-    const exactKit = eKits.find(
-      (k) => k.kitCode.toUpperCase() === normalized && !eKitIds.includes(k.id)
-    );
-
-    const candidateKit =
-      exactKit ||
-      eKits.find(
-        (k) =>
-          k.kitCode.toUpperCase().includes(normalized) &&
-          !eKitIds.includes(k.id)
-      );
-
-    if (!candidateKit) {
-      setError(`Code not found as Pump or E-KIT: ${normalized}`);
-      return;
-    }
-
-    setEKitIds((prev) => [...prev, candidateKit.id]);
-    setEKitCodes((prev) => [...prev, candidateKit.kitCode]);
+    setPumpIds((prev) => [...prev, candidate.id]);
+    setPumpNumbers((prev) => [...prev, candidate.pumpNumber]);
     setPumpSearch("");
     setError("");
-    setInfo(`Added E-KIT #${candidateKit.kitCode}`);
-    setTimeout(() => setInfo(""), 2500);
     focusPumpSearchInput();
   }
 
@@ -1020,8 +865,6 @@ export default function EmployeeOrdersPage() {
               if (changedCustomer) {
                 setPumpIds([]);
                 setPumpNumbers([]);
-                setEKitIds([]);
-                setEKitCodes([]);
                 setPumpSearch("");
               }
             }}
@@ -1037,7 +880,7 @@ export default function EmployeeOrdersPage() {
 
           {!customerId && (
             <p className="text-xs text-white/60">
-              Select a customer first to load customer info and add pumps or E-KITs.
+              Select a customer first to load customer info and add medical pumps.
             </p>
           )}
 
@@ -1072,16 +915,16 @@ export default function EmployeeOrdersPage() {
                     handlePumpScannerEnter();
                   }
                 }}
-                placeholder="Search pump or E-KIT (type or scan barcode/QR)..."
+                placeholder="Search pump (type or scan barcode/QR)..."
                 className="w-full p-2 rounded bg-black border border-white/10"
                 autoFocus
               />
 
               {pumpSearch && (
                 <div className="border border-white/10 rounded bg-black max-h-40 overflow-y-auto">
-                  {filteredPumps.length === 0 && filteredEKits.length === 0 && (
+                  {filteredPumps.length === 0 && (
                     <p className="text-xs text-white/50 p-2">
-                      No pumps or E-KITs found
+                      No pumps found
                     </p>
                   )}
 
@@ -1098,22 +941,6 @@ export default function EmployeeOrdersPage() {
                       className="w-full text-left px-3 py-2 text-sm hover:bg-white/10"
                     >
                       Pump #{p.pumpNumber}
-                    </button>
-                  ))}
-
-                  {filteredEKits.map((k) => (
-                    <button
-                      key={k.id}
-                      type="button"
-                      onClick={() => {
-                        setEKitIds((prev) => [...prev, k.id]);
-                        setEKitCodes((prev) => [...prev, k.kitCode]);
-                        setPumpSearch("");
-                        focusPumpSearchInput();
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 text-violet-300"
-                    >
-                      E-KIT #{k.kitCode}
                     </button>
                   ))}
                 </div>
@@ -1138,33 +965,6 @@ export default function EmployeeOrdersPage() {
                           );
                         }}
                         className="text-red-400 hover:text-red-500"
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {eKitCodes.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {eKitCodes.map((code, idx) => (
-                    <span
-                      key={code}
-                      className="bg-violet-500/20 text-violet-200 text-sm px-3 py-1 rounded flex items-center gap-2"
-                    >
-                      E-KIT #{code}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEKitCodes((prev) =>
-                            prev.filter((_, i) => i !== idx)
-                          );
-                          setEKitIds((prev) =>
-                            prev.filter((_, i) => i !== idx)
-                          );
-                        }}
-                        className="text-red-300 hover:text-red-200"
                       >
                         ✕
                       </button>
@@ -1294,10 +1094,6 @@ export default function EmployeeOrdersPage() {
 
                     <p className="text-xs text-white/60">
                       Pumps: {o.pumpNumbers && o.pumpNumbers.length > 0 ? o.pumpNumbers.join(", ") : "—"}
-                    </p>
-
-                    <p className="text-xs text-white/60">
-                      E-KITs: {o.eKitCodes && o.eKitCodes.length > 0 ? o.eKitCodes.join(", ") : "—"}
                     </p>
 
                     <p className="text-xs text-white/60">

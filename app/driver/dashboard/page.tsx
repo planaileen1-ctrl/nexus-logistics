@@ -56,6 +56,7 @@ type Order = {
   pharmacyName: string;
   customerId?: string;
   pumpNumbers: string[];
+  eKitCodes?: string[];
   customerName: string;
   customerCity?: string;
   customerAddress?: string;
@@ -1232,6 +1233,12 @@ export default function DriverDashboardPage() {
                 >
                   <p className="font-semibold">{o.pharmacyName}</p>
                   <p>{o.customerName}</p>
+                  <p className="text-xs text-white/70">
+                    Pumps: {o.pumpNumbers && o.pumpNumbers.length > 0 ? o.pumpNumbers.join(", ") : "—"}
+                  </p>
+                  <p className="text-xs text-violet-300">
+                    E-KITs: {o.eKitCodes && o.eKitCodes.length > 0 ? o.eKitCodes.join(", ") : "—"}
+                  </p>
 
                   {o.status === "ASSIGNED" && (
                     <button
@@ -1364,6 +1371,7 @@ export default function DriverDashboardPage() {
                 Pharmacy: {selectedOrder.pharmacyName}
               </p>
               <p>Pumps: {selectedOrder.pumpNumbers.join(", ")}</p>
+              <p>E-KITs: {selectedOrder.eKitCodes && selectedOrder.eKitCodes.length > 0 ? selectedOrder.eKitCodes.join(", ") : "—"}</p>
               <p>Address: {selectedOrder.customerAddress}</p>
 
               <SignatureCanvas
@@ -1467,6 +1475,9 @@ export default function DriverDashboardPage() {
                 </p>
                 <p className="text-xs text-white/80">
                   Pumps to deliver: <span className="font-semibold text-white">{selectedOrder.pumpNumbers.join(", ")}</span>
+                </p>
+                <p className="text-xs text-white/80">
+                  E-KITs to deliver: <span className="font-semibold text-violet-200">{selectedOrder.eKitCodes && selectedOrder.eKitCodes.length > 0 ? selectedOrder.eKitCodes.join(", ") : "—"}</span>
                 </p>
                 <p className="text-xs text-white/80">
                   Delivery date/time: <span className="font-semibold text-white">{formatDateTime(deliveryContextTimeISO || new Date().toISOString())}</span>

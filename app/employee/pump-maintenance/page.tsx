@@ -26,6 +26,7 @@ import AdminModeBadge from "@/components/AdminModeBadge";
 type Pump = {
   id: string;
   pumpNumber: string;
+  lastMaintenanceDate?: string | null;
   maintenanceDue?: boolean;
   maintenanceStatus?: {
     cleaned?: boolean;
@@ -33,6 +34,73 @@ type Pump = {
     inspected?: boolean;
   };
 };
+
+function parseUsOrIsoDate(value?: string | null) {
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  const usMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (usMatch) {
+    const month = Number(usMatch[1]);
+    const day = Number(usMatch[2]);
+    const year = Number(usMatch[3]);
+    const parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    ) {
+      return parsed;
+    }
+    return null;
+  }
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const parsed = new Date(year, month - 1, day);
+    if (
+      parsed.getFullYear() === year &&
+      parsed.getMonth() === month - 1 &&
+      parsed.getDate() === day
+    ) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function isMaintenanceDueByDate(lastMaintenanceDate?: string | null) {
+  const baseDate = parseUsOrIsoDate(lastMaintenanceDate);
+  if (!baseDate) return false;
+
+  const dueDate = new Date(baseDate);
+  dueDate.setMonth(dueDate.getMonth() + 1);
+
+  const alertStartDate = new Date(dueDate);
+  alertStartDate.setDate(alertStartDate.getDate() - 7);
+
+  const today = new Date();
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const alertStartDateOnly = new Date(
+    alertStartDate.getFullYear(),
+    alertStartDate.getMonth(),
+    alertStartDate.getDate()
+  );
+
+  return todayOnly.getTime() >= alertStartDateOnly.getTime();
+}
+
+function getTodayUsDate() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const year = now.getFullYear();
+  return `${month}/${day}/${year}`;
+}
 
 export default function PumpMaintenancePage() {
   const router = useRouter();
@@ -116,7 +184,10 @@ export default function PumpMaintenancePage() {
 
   useEffect(() => {
     const filtered = allPumps.filter((p: any) => {
-      if (p.maintenanceDue !== true) return false;
+      const dueByFlag = p.maintenanceDue === true;
+      const dueByDate = isMaintenanceDueByDate(String(p.lastMaintenanceDate || ""));
+      if (!dueByFlag && !dueByDate) return false;
+
       const pumpNumber = String(p.pumpNumber || "").trim();
       if (!pumpNumber) return true;
       return !pendingReturnPumpNumbers.has(pumpNumber);
@@ -146,6 +217,7 @@ export default function PumpMaintenancePage() {
           inspected,
         },
         maintenanceDue: !allDone,
+        lastMaintenanceDate: allDone ? getTodayUsDate() : currentPump?.lastMaintenanceDate || null,
         maintenanceUpdatedAt: serverTimestamp(),
         maintenanceCompletedAt: allDone ? serverTimestamp() : null,
       });
@@ -189,6 +261,11 @@ export default function PumpMaintenancePage() {
                 className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-3"
               >
                 <p className="text-sm font-semibold">Pump #{pump.pumpNumber}</p>
+                {pump.lastMaintenanceDate && (
+                  <p className="text-xs text-emerald-300">
+                    Last Maintenance Date: {pump.lastMaintenanceDate}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 gap-2 text-xs">
                   <label className="flex items-center gap-2">
                     <input

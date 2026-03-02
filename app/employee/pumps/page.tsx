@@ -49,10 +49,70 @@ function formatDate(ts: any) {
   return ts.toDate().toLocaleString("en-US", DATE_TIME_FORMAT);
 }
 
+function formatUsDateOnly(value?: string | null) {
+  if (!value) return "—";
+
+  const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/;
+  if (isoDateOnly.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function normalizeUsDateInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const year = Number(match[3]);
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+
+  const candidate = new Date(year, month - 1, day);
+  const isValid =
+    candidate.getFullYear() === year &&
+    candidate.getMonth() === month - 1 &&
+    candidate.getDate() === day;
+
+  if (!isValid) return null;
+
+  return `${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}/${year}`;
+}
+
+function formatUsDateTyping(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+const LAST_MAINTENANCE_DATE_ERROR = "Last Maintenance Date must be in MM/DD/YYYY format";
+
 type Pump = {
   id: string;
   pumpNumber: string;
   brand?: string | null;
+  lastMaintenanceDate?: string | null;
   status?: string | null;
   maintenanceDue?: boolean;
   createdBy: string;
@@ -113,6 +173,7 @@ export default function EmployeePumpsPage() {
 
   const [pumpNumber, setPumpNumber] = useState("");
   const [brand, setBrand] = useState("");
+  const [lastMaintenanceDate, setLastMaintenanceDate] = useState("");
   const [pumps, setPumps] = useState<Pump[]>([]);
   const [statusFilter, setStatusFilter] = useState<"all" | "maintenance" | "available" | "in_use">("all");
   const [loading, setLoading] = useState(false);
@@ -121,6 +182,35 @@ export default function EmployeePumpsPage() {
   const [editingPumpId, setEditingPumpId] = useState<string | null>(null);
   const [editingPumpNumber, setEditingPumpNumber] = useState("");
   const [editingPumpBrand, setEditingPumpBrand] = useState("");
+  const [editingLastMaintenanceDate, setEditingLastMaintenanceDate] = useState("");
+
+  function validateRegisterLastMaintenanceDateOnBlur() {
+    const value = lastMaintenanceDate.trim();
+    if (!value) return;
+
+    const normalized = normalizeUsDateInput(value);
+    if (!normalized) {
+      setError(LAST_MAINTENANCE_DATE_ERROR);
+      return;
+    }
+
+    setLastMaintenanceDate(normalized);
+    setError((prev) => (prev === LAST_MAINTENANCE_DATE_ERROR ? "" : prev));
+  }
+
+  function validateEditLastMaintenanceDateOnBlur() {
+    const value = editingLastMaintenanceDate.trim();
+    if (!value) return;
+
+    const normalized = normalizeUsDateInput(value);
+    if (!normalized) {
+      setError(LAST_MAINTENANCE_DATE_ERROR);
+      return;
+    }
+
+    setEditingLastMaintenanceDate(normalized);
+    setError((prev) => (prev === LAST_MAINTENANCE_DATE_ERROR ? "" : prev));
+  }
 
   function sortPumps(list: Pump[]) {
     return [...list].sort((a, b) => {
@@ -208,12 +298,19 @@ export default function EmployeePumpsPage() {
       return;
     }
 
+    const normalizedLastMaintenanceDate = normalizeUsDateInput(lastMaintenanceDate);
+    if (lastMaintenanceDate.trim() && !normalizedLastMaintenanceDate) {
+      setError(LAST_MAINTENANCE_DATE_ERROR);
+      return;
+    }
+
     setLoading(true);
 
     try {
       await addDoc(collection(db, "pumps"), {
         pumpNumber,
         brand: brand || null,
+        lastMaintenanceDate: normalizedLastMaintenanceDate,
         pharmacyId,
         pharmacyName,
         createdBy: employeeName,
@@ -225,6 +322,7 @@ export default function EmployeePumpsPage() {
 
       setPumpNumber("");
       setBrand("");
+      setLastMaintenanceDate("");
       await loadPumps();
     } catch (err) {
       console.error(err);
@@ -249,12 +347,14 @@ export default function EmployeePumpsPage() {
     setEditingPumpId(pump.id);
     setEditingPumpNumber(String(pump.pumpNumber || ""));
     setEditingPumpBrand(String(pump.brand || ""));
+    setEditingLastMaintenanceDate(String(pump.lastMaintenanceDate || ""));
   }
 
   function handleCancelEditPump() {
     setEditingPumpId(null);
     setEditingPumpNumber("");
     setEditingPumpBrand("");
+    setEditingLastMaintenanceDate("");
   }
 
   async function handleSaveEditPump(id: string) {
@@ -267,11 +367,18 @@ export default function EmployeePumpsPage() {
       return;
     }
 
+    const normalizedLastMaintenanceDate = normalizeUsDateInput(editingLastMaintenanceDate);
+    if (editingLastMaintenanceDate.trim() && !normalizedLastMaintenanceDate) {
+      setError(LAST_MAINTENANCE_DATE_ERROR);
+      return;
+    }
+
     setLoading(true);
     try {
       await updateDoc(doc(db, "pumps", id), {
         pumpNumber: normalizedPumpNumber,
         brand: editingPumpBrand.trim() || null,
+        lastMaintenanceDate: normalizedLastMaintenanceDate,
       });
 
       handleCancelEditPump();
@@ -309,6 +416,15 @@ export default function EmployeePumpsPage() {
             Register and manage hospital medical pumps
           </p>
           <AdminModeBadge />
+          <div>
+            <button
+              type="button"
+              onClick={() => router.push("/employee/e-kit")}
+              className="text-xs text-violet-300 hover:text-violet-200"
+            >
+              → Open E-KIT Register
+            </button>
+          </div>
         </div>
 
         {/* REGISTER FORM */}
@@ -328,6 +444,18 @@ export default function EmployeePumpsPage() {
             value={brand}
             onChange={(e) => setBrand(e.target.value)}
             placeholder="Brand (optional)"
+            className="w-full p-2 rounded bg-black border border-white/10"
+          />
+
+          <p className="text-xs text-white/60">Last Maintenance Date (optional)</p>
+          <input
+            type="text"
+            value={lastMaintenanceDate}
+            onChange={(e) => setLastMaintenanceDate(formatUsDateTyping(e.target.value))}
+            onBlur={validateRegisterLastMaintenanceDateOnBlur}
+            placeholder="MM/DD/YYYY"
+            inputMode="numeric"
+            maxLength={10}
             className="w-full p-2 rounded bg-black border border-white/10"
           />
 
@@ -429,6 +557,17 @@ export default function EmployeePumpsPage() {
                         placeholder="Brand (optional)"
                         className="w-full max-w-xs p-2 rounded bg-black border border-white/10 text-sm"
                       />
+                      <p className="text-xs text-white/60">Last Maintenance Date (optional)</p>
+                      <input
+                        type="text"
+                        value={editingLastMaintenanceDate}
+                        onChange={(e) => setEditingLastMaintenanceDate(formatUsDateTyping(e.target.value))}
+                        onBlur={validateEditLastMaintenanceDateOnBlur}
+                        placeholder="MM/DD/YYYY"
+                        inputMode="numeric"
+                        maxLength={10}
+                        className="w-full max-w-xs p-2 rounded bg-black border border-white/10 text-sm"
+                      />
                     </div>
                   ) : (
                     <p className="font-medium">
@@ -448,6 +587,13 @@ export default function EmployeePumpsPage() {
                   {p.brand && editingPumpId !== p.id && (
                     <p className="text-xs text-white/60">
                       Brand: {p.brand}
+                    </p>
+                  )}
+
+                  {p.lastMaintenanceDate && editingPumpId !== p.id && (
+                    <p className="text-xs text-white/60">
+                      Last Maintenance Date:{" "}
+                      <span className="text-emerald-300">{formatUsDateOnly(p.lastMaintenanceDate)}</span>
                     </p>
                   )}
 
